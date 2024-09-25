@@ -1,18 +1,47 @@
 import { Injectable } from '@nestjs/common';
+import * as crypto from 'crypto';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as unzipper from 'unzipper';
+import * as archiver from 'archiver';
+import * as Stream from 'node:stream';
 
-interface FileDetails {
+export interface FileDetails {
   path: string;
   fullPath: string;
   size: number;
   type: 'file' | 'directory';
+  hash?: string;
 }
 
 @Injectable()
 export class FileService {
   private readonly staticPath = path.join(__dirname, '..', '..', 'static');
+
+  private calculateFileHash(filePath: string): string {
+    const fileBuffer = fs.readFileSync(filePath);
+    const hashSum = crypto.createHash('sha256');
+    hashSum.update(fileBuffer);
+    return hashSum.digest('hex');
+  }
+
+  private calculateDirectoryHash(directoryPath: string): string {
+    const items = fs.readdirSync(directoryPath);
+    const hashSum = crypto.createHash('sha256');
+
+    for (const item of items) {
+      const fullPath = path.join(directoryPath, item);
+      const stats = fs.statSync(fullPath);
+
+      if (stats.isFile()) {
+        hashSum.update(this.calculateFileHash(fullPath));
+      } else if (stats.isDirectory()) {
+        hashSum.update(this.calculateDirectoryHash(fullPath));
+      }
+    }
+
+    return hashSum.digest('hex');
+  }
 
   public async unpackArchive(
     pathname: string,
@@ -44,25 +73,17 @@ export class FileService {
             .on('error', reject);
         });
 
+        const fileHash = this.calculateFileHash(filePath);
+
         this.addToFileStructure(fileStructure, file.path, {
           path: file.path,
-          fullPath: path.relative(this.staticPath, filePath), // Изменено
+          fullPath: path.relative(this.staticPath, filePath),
           size: file.uncompressedSize,
           type: 'file',
+          hash: fileHash,
         });
       }
     }
-
-    /*
-    *  else {
-        this.addToFileStructure(fileStructure, file.path, {
-          path: file.path,
-          fullPath: path.relative(this.staticPath, filePath), // Изменено
-          size: 0,
-          type: 'directory',
-        });
-      }
-    * */
 
     return fileStructure;
   }
@@ -108,15 +129,17 @@ export class FileService {
       if (stats.isDirectory()) {
         result[item] = {
           files: this.getFilesInDirectory(fullPath),
+          hash: this.calculateDirectoryHash(fullPath),
         };
       } else {
-        result[path.basename(path.dirname(fullPath))] = {
+        result[item] = {
           files: [
             {
               path: item,
-              fullPath: path.relative(this.staticPath, fullPath), // Изменено
+              fullPath: path.relative(this.staticPath, fullPath),
               size: stats.size,
               type: 'file',
+              hash: this.calculateFileHash(fullPath),
             },
           ],
         };
@@ -126,14 +149,19 @@ export class FileService {
     return result;
   }
 
-  private getFilesInDirectory(
-    directory: string,
-  ): Array<{ path: string; fullPath: string; size: number; type: 'file' }> {
+  private getFilesInDirectory(directory: string): Array<{
+    path: string;
+    fullPath: string;
+    size: number;
+    type: 'file';
+    hash: string;
+  }> {
     const files: Array<{
       path: string;
       fullPath: string;
       size: number;
       type: 'file';
+      hash: string;
     }> = [];
     const items = fs.readdirSync(directory);
 
@@ -144,13 +172,76 @@ export class FileService {
       if (stats.isFile()) {
         files.push({
           path: item,
-          fullPath: path.relative(this.staticPath, fullPath), // Изменено
+          fullPath: path.relative(this.staticPath, fullPath),
           size: stats.size,
           type: 'file',
+          hash: this.calculateFileHash(fullPath),
         });
       }
     }
 
     return files;
+  }
+
+  // Улучшенный метод создания архива
+  public async createArchive(
+    directoryPath: string,
+  ): Promise<Stream.PassThrough> {
+    const targetPath = path.join(this.staticPath, directoryPath);
+
+    if (!fs.existsSync(targetPath)) {
+      throw new Error('Directory does not exist');
+    }
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    const outputStream = new Stream.PassThrough();
+
+    archive.on('error', (err) => {
+      throw err;
+    });
+
+    // Вызывается при завершении архивации
+    archive.on('end', () => {
+      console.log('Archiving finished successfully.');
+    });
+
+    // Для отладки прогресса
+    archive.on('progress', (progress) => {
+      console.log(progress);
+    });
+
+    // Подключаем поток архива к outputStream
+    archive.pipe(outputStream);
+
+    // Добавляем директорию в архив
+    await this.addDirectoryToArchive(archive, targetPath, '');
+
+    // Ожидаем завершения архивации
+    await archive.finalize();
+
+    return outputStream;
+  }
+
+  // Обновленный метод добавления директорий в архив
+  private async addDirectoryToArchive(
+    archive: archiver.Archiver,
+    currentPath: string,
+    relativePath: string,
+  ) {
+    const items = fs.readdirSync(currentPath);
+
+    for (const item of items) {
+      const fullPath = path.join(currentPath, item);
+      const relativeItemPath = path.join(relativePath, item);
+      const stats = fs.statSync(fullPath);
+
+      if (stats.isDirectory()) {
+        // Добавляем директорию в архив
+        archive.directory(fullPath, relativeItemPath);
+      } else {
+        // Добавляем файл в архив
+        archive.file(fullPath, { name: relativeItemPath });
+      }
+    }
   }
 }

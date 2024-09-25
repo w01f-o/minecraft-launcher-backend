@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateDto } from './dto/create.dto';
 import { DatabaseService } from '../database/database.service';
-import { FileService } from '../file/file.service';
+import { FileDetails, FileService } from '../file/file.service';
 import * as path from 'node:path';
 import { Mod } from '@prisma/client';
+import { ModLoaders } from '../enums/ModLoaders.enum';
 
 @Injectable()
 export class ModpackService {
@@ -12,36 +13,39 @@ export class ModpackService {
     private readonly fileService: FileService,
   ) {}
 
-  private readonly staticFolderName: string = 'modpacks';
+  public readonly staticFolderName: string = 'modpacks';
 
   public async getAll() {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
     return this.databaseService.modPack.findMany({
       include: { screenshots: true, mods: false },
     });
   }
 
   public async getById(id: string) {
-    // const modpack = await this.databaseService.modPack.findUnique({
-    //   where: {
-    //     id,
-    //   },
-    //   include: {
-    //     screenshots: true,
-    //     mods: true,
-    //     updates: true,
-    //   },
-    // });
-    //
-    // if (!modpack) {
-    //   throw new NotFoundException(`ModPack with id ${id} not found`);
-    // }
-    const fileStructure = await this.fileService.getFileStructure(
-      path.join(this.staticFolderName, 'test'),
-    );
-    return fileStructure;
-  }
+    const modpack = await this.databaseService.modPack.findUnique({
+      where: {
+        id,
+      },
+      include: {
+        screenshots: true,
+        mods: true,
+      },
+    });
 
+    if (!modpack) {
+      throw new NotFoundException(`ModPack with id ${id} not found`);
+    }
+
+    const fileStructure = await this.fileService.getFileStructure(
+      path.join(this.staticFolderName, modpack.directoryName),
+    );
+
+    return {
+      ...modpack,
+      fileStructure,
+    };
+  }
+  //988574f4007f5eaba730ab8bbc7684382705906f68008e8aadc374d449750644
   public async create(
     archive: Express.Multer.File,
     createModPackDto: CreateDto,
@@ -55,22 +59,41 @@ export class ModpackService {
       description,
     } = createModPackDto;
 
+    if (!(modLoader.toUpperCase().trim() in ModLoaders)) {
+      throw new Error('Invalid mod loader');
+    }
+
     const fileStructure = await this.fileService.unpackArchive(
-      path.join(this.staticFolderName, 'test'),
+      path.join(this.staticFolderName, directoryName),
       archive,
     );
 
-    const screenshots = fileStructure['launcher-screenshots'].files.map(
-      (file) => ({ thumbnail: file.fullPath }),
+    const thumbnail = fileStructure['files'].find(
+      (file: FileDetails) => file.path.split('.').shift() === 'thumbnail',
+    )?.fullPath;
+    const screenshots = fileStructure['launcher-screenshots']?.files.map(
+      (file: FileDetails) => ({ thumbnail: file?.fullPath }),
     );
 
-    const mods: Mod[] = fileStructure['mods'].files.map((file) => ({
-      name: file.path.split('/').pop(),
-      description: file.path.split('/').pop(),
-      minecraftVersion,
-      thumbnail: fileStructure['files'][2].fullPath,
-      version: minecraftVersion,
-    }));
+    if (!thumbnail) {
+      throw new Error('Thumbnail not found. Directory for thumbnail is /');
+    }
+
+    if (!screenshots) {
+      throw new Error(
+        'Screenshots not found. Directory for screenshots is /launcher-screenshots',
+      );
+    }
+
+    const mods: Mod[] = fileStructure['mods'].files.map(
+      (file: FileDetails) => ({
+        name: file.path.split('/').pop(),
+        description: file.path.split('/').pop(),
+        minecraftVersion,
+        thumbnail,
+        version: minecraftVersion,
+      }),
+    );
 
     const newModPack = await this.databaseService.modPack.create({
       data: {
@@ -80,7 +103,7 @@ export class ModpackService {
         minecraftVersion,
         modLoader,
         javaVersion,
-        thumbnail: fileStructure['files'][2].fullPath,
+        thumbnail,
         size: archive.size,
         mods: {
           createMany: { data: mods },
@@ -91,7 +114,7 @@ export class ModpackService {
       },
     });
 
-    return { fileStructure, modpack: newModPack };
+    return { ...newModPack, fileStructure };
   }
 
   public async update() {}

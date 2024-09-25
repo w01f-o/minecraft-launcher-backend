@@ -20,7 +20,6 @@ model ModPack {
   mods             Mod[]
   isActual         Boolean      @default(false) @map("is_actual")
   isUpdated        Boolean      @default(false) @map("is_updated")
-  updates          Update[]
   javaVersion      String       @map("java_version")
   modLoader        String       @map("mod_loader")
   size             Int          @map("size")
@@ -31,14 +30,6 @@ model Screenshot {
   thumbnail String
   modPackId String  @map("modPack_id")
   modPack   ModPack @relation(fields: [modPackId], references: [id])
-}
-
-model Update {
-  id              String  @id @default(uuid())
-  deletedFilePath String  @map("deleted_file_path")
-  newFilePath     String  @map("new_file_path")
-  modPackId       String  @map("modpack_id")
-  modPack         ModPack @relation(fields: [modPackId], references: [id])
 }
 
 model Mod {
