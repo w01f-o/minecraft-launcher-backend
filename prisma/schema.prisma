@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ModPack {
+  id               String       @id @default(uuid())
+  name             String
+  directoryName    String       @map("directory_name")
+  description      String
+  minecraftVersion String       @map("minecraft_version")
+  thumbnail        String
+  screenshots      Screenshot[]
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @default(now()) @map("updated_at")
+  mods             Mod[]
+  isActual         Boolean      @default(false) @map("is_actual")
+  isUpdated        Boolean      @default(false) @map("is_updated")
+  updates          Update[]
+  javaVersion      String       @map("java_version")
+  modLoader        String       @map("mod_loader")
+  size             Int          @map("size")
+}
+
+model Screenshot {
+  id        String  @id @default(uuid())
+  thumbnail String
+  modPackId String  @map("modPack_id")
+  modPack   ModPack @relation(fields: [modPackId], references: [id])
+}
+
+model Update {
+  id              String  @id @default(uuid())
+  deletedFilePath String  @map("deleted_file_path")
+  newFilePath     String  @map("new_file_path")
+  modPackId       String  @map("modpack_id")
+  modPack         ModPack @relation(fields: [modPackId], references: [id])
+}
+
+model Mod {
+  id               String   @id @default(uuid())
+  name             String
+  description      String
+  version          String
+  minecraftVersion String   @map("minecraft_version")
+  thumbnail        String
+  createdAt        DateTime @default(now()) @map("created_at")
+  modPackId        String   @map("modpack_id")
+  modPacks         ModPack  @relation(fields: [modPackId], references: [id])
+}
