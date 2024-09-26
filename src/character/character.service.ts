@@ -13,7 +13,7 @@ export class CharacterService {
 
   public readonly staticFolderName: string = 'characters';
 
-  public async getSkin(user: string): Promise<Character> {
+  public async getCharacterByUserName(user: string): Promise<Character> {
     const username = user.split('.').shift();
 
     const character = await this.databaseService.character.findFirst({
@@ -31,13 +31,13 @@ export class CharacterService {
     };
   }
 
-  public async getSkinByHwid(hwid: string): Promise<Character> {
+  public async getCharacterByHwid(hwid: string): Promise<Character> {
     const character = await this.databaseService.character.findUnique({
       where: { hwid },
     });
 
     return {
-      username: character.username,
+      username: character?.username ?? null,
       skins: {
         default: character?.skin ?? null,
       },

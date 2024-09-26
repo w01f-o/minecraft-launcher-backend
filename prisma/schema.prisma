@@ -29,7 +29,7 @@ model Screenshot {
   id        String  @id @default(uuid())
   thumbnail String
   modPackId String  @map("modPack_id")
-  modPack   ModPack @relation(fields: [modPackId], references: [id])
+  modPack   ModPack @relation(fields: [modPackId], references: [id], onDelete: Cascade)
 }
 
 model Mod {
@@ -38,10 +38,11 @@ model Mod {
   description      String
   version          String
   minecraftVersion String   @map("minecraft_version")
-  thumbnail        String
+  thumbnail        String?
   createdAt        DateTime @default(now()) @map("created_at")
   modPackId        String   @map("modpack_id")
-  modPacks         ModPack  @relation(fields: [modPackId], references: [id])
+  modPack          ModPack  @relation(fields: [modPackId], references: [id], onDelete: Cascade)
+  modrinthSlug     String   @map("modrinth_slug") @unique
 }
 
 model Character {

@@ -7,20 +7,22 @@ import { CreateDto } from './dto/create.dto';
 import { DatabaseService } from '../database/database.service';
 import { FileDetails, FileService } from '../file/file.service';
 import * as path from 'node:path';
-import { Mod } from '@prisma/client';
+import { ModService } from '../mod/mod.service';
+import { ModrinthMod } from '../types/ModrinthMod.type';
 
 @Injectable()
 export class ModpackService {
   public constructor(
     private readonly databaseService: DatabaseService,
     private readonly fileService: FileService,
+    private readonly modService: ModService,
   ) {}
 
   public readonly staticFolderName: string = 'modpacks';
 
   public async getAll() {
     return this.databaseService.modPack.findMany({
-      include: { screenshots: true, mods: false },
+      include: { screenshots: true, mods: true },
     });
   }
 
@@ -67,7 +69,8 @@ export class ModpackService {
     );
 
     const thumbnail = fileStructure['files'].find(
-      (file: FileDetails) => file.path.split('.').shift() === 'thumbnail',
+      (file: FileDetails) =>
+        file.path.split('.').shift().trim() === 'thumbnail',
     )?.fullPath;
     const screenshots = fileStructure['launcher-screenshots']?.files.map(
       (file: FileDetails) => ({ thumbnail: file?.fullPath }),
@@ -85,34 +88,47 @@ export class ModpackService {
       );
     }
 
-    const mods: Mod[] = fileStructure['mods'].files.map(
-      (file: FileDetails) => ({
-        name: file.path.split('/').pop(),
-        description: file.path.split('/').pop(),
-        minecraftVersion,
-        thumbnail,
-        version: minecraftVersion,
-      }),
-    );
-
     const newModPack = await this.databaseService.modPack.create({
       data: {
         name,
         directoryName,
         description,
         minecraftVersion,
-        modLoader,
+        modLoader: modLoader.toUpperCase().trim(),
         javaVersion,
         thumbnail,
         size: archive.size,
-        mods: {
-          createMany: { data: mods },
-        },
         screenshots: {
           createMany: { data: screenshots },
         },
       },
     });
+
+    await Promise.all(
+      fileStructure['mods'].files.map(async (file: FileDetails) => {
+        const modNameFromFile = file.path.split('/').pop().replace(/-.+$/, '');
+
+        const modFromModrinth: ModrinthMod =
+          await this.modService.searchOnModrinth(modNameFromFile);
+        const { icon_url, title, slug, description } = modFromModrinth.hits[0];
+
+        await this.databaseService.mod.create({
+          data: {
+            name: title,
+            thumbnail: icon_url || null,
+            description,
+            minecraftVersion,
+            modPack: {
+              connect: {
+                id: newModPack.id,
+              },
+            },
+            version: minecraftVersion,
+            modrinthSlug: slug,
+          },
+        });
+      }),
+    );
 
     return { ...newModPack, fileStructure };
   }
@@ -120,32 +136,6 @@ export class ModpackService {
   public async update() {}
 
   public async delete(id: string) {
-    const modpackFromDb = await this.databaseService.modPack.findUnique({
-      where: {
-        id,
-      },
-      include: {
-        screenshots: true,
-        mods: true,
-      },
-    });
-
-    modpackFromDb.mods.forEach((mod) => {
-      this.databaseService.mod.delete({
-        where: {
-          id: mod.id,
-        },
-      });
-    });
-
-    modpackFromDb.screenshots.forEach((screenshot) => {
-      this.databaseService.screenshot.delete({
-        where: {
-          id: screenshot.id,
-        },
-      });
-    });
-
     return this.databaseService.modPack.delete({
       where: {
         id,

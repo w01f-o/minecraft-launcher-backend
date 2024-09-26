@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -13,9 +12,9 @@ import {
 } from '@nestjs/common';
 import { CharacterService } from './character.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import * as fs from 'fs';
 import { createReadStream } from 'fs';
 import * as path from 'path';
-import * as fs from 'fs';
 import { UpdateDto } from './dto/set.dto';
 import { Response } from 'express';
 
@@ -24,13 +23,13 @@ export class CharacterController {
   constructor(private readonly characterService: CharacterService) {}
 
   @Get(':user')
-  async getSkin(@Param('user') user: string) {
-    return this.characterService.getSkin(user);
+  async getCharacterByUsername(@Param('user') user: string) {
+    return this.characterService.getCharacterByUserName(user);
   }
 
   @Get('hwid/:hwid')
-  async getCape(@Param('hwid') hwid: string) {
-    return this.characterService.getSkinByHwid(hwid);
+  async getCharacterByHwid(@Param('hwid') hwid: string) {
+    return this.characterService.getCharacterByHwid(hwid);
   }
 
   @Get('textures/:skin')
