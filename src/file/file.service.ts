@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as unzipper from 'unzipper';
-import * as archiver from 'archiver';
-import * as Stream from 'node:stream';
+import * as JSZip from 'jszip';
+import * as uuid from 'uuid';
 
 export interface FileDetails {
   path: string;
@@ -183,65 +183,54 @@ export class FileService {
     return files;
   }
 
-  // Улучшенный метод создания архива
-  public async createArchive(
-    directoryPath: string,
-  ): Promise<Stream.PassThrough> {
+  public async createArchive(directoryPath: string): Promise<Buffer> {
     const targetPath = path.join(this.staticPath, directoryPath);
 
     if (!fs.existsSync(targetPath)) {
       throw new Error('Directory does not exist');
     }
 
-    const archive = archiver('zip', { zlib: { level: 9 } });
-    const outputStream = new Stream.PassThrough();
+    const zip = new JSZip();
 
-    archive.on('error', (err) => {
-      throw err;
-    });
+    try {
+      await this.addDirectoryToZip(zip, targetPath);
 
-    // Вызывается при завершении архивации
-    archive.on('end', () => {
-      console.log('Archiving finished successfully.');
-    });
-
-    // Для отладки прогресса
-    archive.on('progress', (progress) => {
-      console.log(progress);
-    });
-
-    // Подключаем поток архива к outputStream
-    archive.pipe(outputStream);
-
-    // Добавляем директорию в архив
-    await this.addDirectoryToArchive(archive, targetPath, '');
-
-    // Ожидаем завершения архивации
-    await archive.finalize();
-
-    return outputStream;
+      return await zip.generateAsync({ type: 'nodebuffer' });
+    } catch (error) {
+      console.error('Error during archiving process:', error);
+      throw error;
+    }
   }
 
-  // Обновленный метод добавления директорий в архив
-  private async addDirectoryToArchive(
-    archive: archiver.Archiver,
-    currentPath: string,
-    relativePath: string,
-  ) {
+  private async addDirectoryToZip(zip: JSZip, currentPath: string) {
     const items = fs.readdirSync(currentPath);
 
     for (const item of items) {
       const fullPath = path.join(currentPath, item);
-      const relativeItemPath = path.join(relativePath, item);
+      const relativeItemPath = path.join(item);
       const stats = fs.statSync(fullPath);
 
       if (stats.isDirectory()) {
-        // Добавляем директорию в архив
-        archive.directory(fullPath, relativeItemPath);
+        const folder = zip.folder(relativeItemPath);
+        await this.addDirectoryToZip(folder, fullPath);
       } else {
-        // Добавляем файл в архив
-        archive.file(fullPath, { name: relativeItemPath });
+        const fileData = fs.readFileSync(fullPath);
+        zip.file(relativeItemPath, fileData);
       }
     }
+  }
+
+  public async saveFileOnServer(file: Express.Multer.File, targetPath: string) {
+    const fileExt = file.originalname.split('.').pop();
+    const fileName = `${uuid.v4()}.${fileExt}`;
+    const filePath = path.join(this.staticPath, targetPath, fileName);
+
+    fs.writeFile(filePath, file.buffer, (err) => {
+      if (err) {
+        throw new ForbiddenException(err);
+      }
+    });
+
+    return fileName;
   }
 }

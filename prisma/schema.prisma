@@ -43,3 +43,13 @@ model Mod {
   modPackId        String   @map("modpack_id")
   modPacks         ModPack  @relation(fields: [modPackId], references: [id])
 }
+
+model Character {
+  id        String   @id @default(uuid())
+  hwid      String   @unique
+  username  String   @default("Steve")
+  skin      String?
+  cape      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+}

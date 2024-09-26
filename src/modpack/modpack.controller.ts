@@ -41,20 +41,15 @@ export class ModpackController {
       modpack.directoryName,
     );
 
-    try {
-      const archiveStream = await this.fileService.createArchive(modpackPath);
+    const zipBuffer = await this.fileService.createArchive(modpackPath);
 
-      res.set({
-        'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="${modpack.name}.zip"`,
-        // Убираем 'Content-Length', если размер заранее неизвестен
-      });
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${modpack.directoryName}.zip"`,
+      'Content-Length': zipBuffer.length,
+    });
 
-      // Передача потока данных
-      archiveStream.pipe(res);
-    } catch (error) {
-      res.status(500).send('Error while creating archive: ' + error.message);
-    }
+    res.send(zipBuffer);
   }
 
   @Post()
