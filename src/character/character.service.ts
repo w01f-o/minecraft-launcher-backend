@@ -3,6 +3,10 @@ import { DatabaseService } from 'src/database/database.service';
 import { FileService } from 'src/file/file.service';
 import { UpdateDto } from './dto/set.dto';
 import { Character } from '../types/Character.type';
+import * as crypto from 'crypto';
+import * as fs from 'fs';
+import { promisify } from 'util';
+import * as path from 'path';
 
 @Injectable()
 export class CharacterService {
@@ -53,7 +57,7 @@ export class CharacterService {
     },
   ): Promise<Character> {
     const { hwid, username } = updateCharacterDto;
-
+    console.log(files.skin[0]);
     const characterFromDb = await this.databaseService.character.findUnique({
       where: { hwid },
     });
@@ -61,18 +65,61 @@ export class CharacterService {
     let capeFileName: string | null = null;
     let skinFileName: string | null = null;
 
-    if (files.cape) {
-      capeFileName = await this.fileService.saveFileOnServer(
-        files.cape[0],
+    const readFile = promisify(fs.readFile);
+    const readdir = promisify(fs.readdir);
+
+    const calculateHash = async (
+      file: Express.Multer.File,
+    ): Promise<string> => {
+      return crypto.createHash('sha256').update(file.buffer).digest('hex');
+    };
+
+    const checkIfFileExists = async (hash: string): Promise<string | null> => {
+      const dirPath = path.join(
+        __dirname,
+        '..',
+        '..',
+        'static',
         this.staticFolderName,
       );
+      const files = await readdir(dirPath);
+
+      for (const file of files) {
+        const filePath = path.join(dirPath, file);
+        const existingFileBuffer = await readFile(filePath);
+        const existingFileHash = crypto
+          .createHash('sha256')
+          .update(existingFileBuffer)
+          .digest('hex');
+
+        if (existingFileHash === hash) {
+          return file;
+        }
+      }
+
+      return null;
+    };
+
+    if (files.cape) {
+      const capeHash = await calculateHash(files.cape[0]);
+      capeFileName = await checkIfFileExists(capeHash);
+      if (!capeFileName) {
+        capeFileName = await this.fileService.saveFileOnServer(
+          files.cape[0],
+          this.staticFolderName,
+        );
+      }
     }
 
     if (files.skin) {
-      skinFileName = await this.fileService.saveFileOnServer(
-        files.skin[0],
-        this.staticFolderName,
-      );
+      const skinHash = await calculateHash(files.skin[0]);
+      skinFileName = await checkIfFileExists(skinHash);
+      if (!skinFileName) {
+        skinFileName = await this.fileService.saveFileOnServer(
+          files.skin[0],
+          this.staticFolderName,
+        );
+      }
     }
 
     if (!characterFromDb) {
