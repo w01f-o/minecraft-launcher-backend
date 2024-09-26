@@ -57,7 +57,7 @@ export class CharacterService {
     },
   ): Promise<Character> {
     const { hwid, username } = updateCharacterDto;
-    console.log(files.skin[0]);
+
     const characterFromDb = await this.databaseService.character.findUnique({
       where: { hwid },
     });
