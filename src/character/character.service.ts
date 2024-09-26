@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
 import { FileService } from 'src/file/file.service';
 import { UpdateDto } from './dto/set.dto';
+import { Character } from '../types/Character.type';
 
 @Injectable()
 export class CharacterService {
@@ -12,7 +13,7 @@ export class CharacterService {
 
   public readonly staticFolderName: string = 'characters';
 
-  public async getSkin(user: string) {
+  public async getSkin(user: string): Promise<Character> {
     const username = user.split('.').shift();
 
     const character = await this.databaseService.character.findFirst({
@@ -30,8 +31,7 @@ export class CharacterService {
     };
   }
 
-  public async getSkinByHwid(hwid: string) {
-    // await new Promise((resolve) => setTimeout(resolve, 3000));
+  public async getSkinByHwid(hwid: string): Promise<Character> {
     const character = await this.databaseService.character.findUnique({
       where: { hwid },
     });
@@ -51,9 +51,9 @@ export class CharacterService {
       skin?: Express.Multer.File[];
       cape?: Express.Multer.File[];
     },
-  ) {
+  ): Promise<Character> {
     const { hwid, username } = updateCharacterDto;
-    // await new Promise((resolve) => setTimeout(resolve, 3000));
+
     const characterFromDb = await this.databaseService.character.findUnique({
       where: { hwid },
     });
@@ -112,12 +112,20 @@ export class CharacterService {
     };
   }
 
-  public deleteCape(hwid: string) {
-    return this.databaseService.character.update({
+  public async deleteCape(hwid: string): Promise<Character> {
+    const char = await this.databaseService.character.update({
       where: { hwid },
       data: {
         cape: null,
       },
     });
+
+    return {
+      username: char.username,
+      skins: {
+        default: char?.skin ?? '',
+      },
+      cape: char?.cape ?? '',
+    };
   }
 }

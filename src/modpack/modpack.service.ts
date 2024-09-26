@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateDto } from './dto/create.dto';
 import { DatabaseService } from '../database/database.service';
 import { FileDetails, FileService } from '../file/file.service';
 import * as path from 'node:path';
 import { Mod } from '@prisma/client';
-import { ModLoaders } from '../enums/ModLoaders.enum';
 
 @Injectable()
 export class ModpackService {
@@ -45,7 +48,7 @@ export class ModpackService {
       fileStructure,
     };
   }
-  //988574f4007f5eaba730ab8bbc7684382705906f68008e8aadc374d449750644
+
   public async create(
     archive: Express.Multer.File,
     createModPackDto: CreateDto,
@@ -58,11 +61,6 @@ export class ModpackService {
       modLoader,
       description,
     } = createModPackDto;
-
-    if (!(modLoader.toUpperCase().trim() in ModLoaders)) {
-      throw new Error('Invalid mod loader');
-    }
-
     const fileStructure = await this.fileService.unpackArchive(
       path.join(this.staticFolderName, directoryName),
       archive,
@@ -76,11 +74,13 @@ export class ModpackService {
     );
 
     if (!thumbnail) {
-      throw new Error('Thumbnail not found. Directory for thumbnail is /');
+      throw new BadRequestException(
+        'Thumbnail not found. Directory for thumbnail is /',
+      );
     }
 
     if (!screenshots) {
-      throw new Error(
+      throw new BadRequestException(
         'Screenshots not found. Directory for screenshots is /launcher-screenshots',
       );
     }
@@ -118,4 +118,38 @@ export class ModpackService {
   }
 
   public async update() {}
+
+  public async delete(id: string) {
+    const modpackFromDb = await this.databaseService.modPack.findUnique({
+      where: {
+        id,
+      },
+      include: {
+        screenshots: true,
+        mods: true,
+      },
+    });
+
+    modpackFromDb.mods.forEach((mod) => {
+      this.databaseService.mod.delete({
+        where: {
+          id: mod.id,
+        },
+      });
+    });
+
+    modpackFromDb.screenshots.forEach((screenshot) => {
+      this.databaseService.screenshot.delete({
+        where: {
+          id: screenshot.id,
+        },
+      });
+    });
+
+    return this.databaseService.modPack.delete({
+      where: {
+        id,
+      },
+    });
+  }
 }

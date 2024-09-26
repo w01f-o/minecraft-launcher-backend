@@ -1,5 +1,5 @@
 export enum ModLoaders {
-  FORGE,
-  FABRIC,
-  QUILT,
+  FORGE = 'FORGE',
+  FABRIC = 'FABRIC',
+  QUILT = 'QUILT',
 }

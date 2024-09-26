@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Res,
@@ -15,6 +17,7 @@ import { createReadStream } from 'fs';
 import * as path from 'path';
 import * as fs from 'fs';
 import { UpdateDto } from './dto/set.dto';
+import { Response } from 'express';
 
 @Controller('character')
 export class CharacterController {
@@ -31,7 +34,7 @@ export class CharacterController {
   }
 
   @Get('textures/:skin')
-  async getSkinImage(@Res() res, @Param('skin') skin: string) {
+  async getSkinImage(@Res() res: Response, @Param('skin') skin: string) {
     const skinPath = path.join(
       __dirname,
       '..',
@@ -42,7 +45,7 @@ export class CharacterController {
     );
 
     if (!fs.existsSync(skinPath)) {
-      throw new Error('Skin not found');
+      throw new NotFoundException('Skin not found');
     }
 
     const file = createReadStream(skinPath);

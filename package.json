@@ -25,6 +25,7 @@
     "@nestjs/mapped-types": "*",
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/serve-static": "^4.0.2",
+    "@nestjs/throttler": "^6.2.1",
     "@prisma/client": "^5.20.0",
     "@types/archiver": "^6.0.2",
     "archiver": "^7.0.1",

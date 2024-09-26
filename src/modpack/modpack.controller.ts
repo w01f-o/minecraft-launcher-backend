@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -63,4 +64,9 @@ export class ModpackController {
 
   @Patch(':id')
   public async update() {}
+
+  @Delete(':id')
+  public async delete(@Param('id') id: string) {
+    return await this.modpackService.delete(id);
+  }
 }

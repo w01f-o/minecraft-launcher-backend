@@ -1,4 +1,12 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+} from 'class-validator';
+import { ModLoaders } from '../../enums/ModLoaders.enum';
+import { Transform } from 'class-transformer';
 
 export class CreateDto {
   @IsNotEmpty()
@@ -15,10 +23,13 @@ export class CreateDto {
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => value.trim())
+  @Matches('^\\d+\\.\\d+\\.\\d+$')
   minecraftVersion: string;
 
-  @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => value.toUpperCase().trim())
+  @IsEnum(ModLoaders)
   modLoader: string;
 
   @IsString()
