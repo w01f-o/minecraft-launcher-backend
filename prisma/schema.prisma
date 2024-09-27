@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Mod {
+  id               String    @id @default(uuid())
+  name             String
+  description      String
+  minecraftVersion String    @map("minecraft_version")
+  thumbnail        String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  modrinthSlug     String    @unique @map("modrinth_slug")
+  modPacks         ModPack[] @relation("ModToModPack")
+}
+
 model ModPack {
   id               String       @id @default(uuid())
   name             String
@@ -17,9 +28,8 @@ model ModPack {
   screenshots      Screenshot[]
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @default(now()) @map("updated_at")
-  mods             Mod[]
-  isActual         Boolean      @default(false) @map("is_actual")
-  isUpdated        Boolean      @default(false) @map("is_updated")
+  mods             Mod[]        @relation("ModToModPack")
+  isActual         Boolean      @default(true) @map("is_actual")
   javaVersion      String       @map("java_version")
   modLoader        String       @map("mod_loader")
   size             Int          @map("size")
@@ -30,19 +40,6 @@ model Screenshot {
   thumbnail String
   modPackId String  @map("modPack_id")
   modPack   ModPack @relation(fields: [modPackId], references: [id], onDelete: Cascade)
-}
-
-model Mod {
-  id               String   @id @default(uuid())
-  name             String
-  description      String
-  version          String
-  minecraftVersion String   @map("minecraft_version")
-  thumbnail        String?
-  createdAt        DateTime @default(now()) @map("created_at")
-  modPackId        String   @map("modpack_id")
-  modPack          ModPack  @relation(fields: [modPackId], references: [id], onDelete: Cascade)
-  modrinthSlug     String   @map("modrinth_slug") @unique
 }
 
 model Character {

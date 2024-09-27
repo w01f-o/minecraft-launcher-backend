@@ -111,22 +111,41 @@ export class ModpackService {
         const modFromModrinth: ModrinthMod =
           await this.modService.searchOnModrinth(modNameFromFile);
         const { icon_url, title, slug, description } = modFromModrinth.hits[0];
-
-        await this.databaseService.mod.create({
-          data: {
-            name: title,
-            thumbnail: icon_url || null,
-            description,
-            minecraftVersion,
-            modPack: {
-              connect: {
-                id: newModPack.id,
-              },
-            },
-            version: minecraftVersion,
+        const modFromDb = await this.databaseService.mod.findUnique({
+          where: {
             modrinthSlug: slug,
           },
         });
+
+        if (modFromDb) {
+          await this.databaseService.mod.update({
+            where: {
+              id: modFromDb.id,
+            },
+            data: {
+              modPacks: {
+                connect: {
+                  id: newModPack.id,
+                },
+              },
+            },
+          });
+        } else {
+          await this.databaseService.mod.create({
+            data: {
+              name: title,
+              thumbnail: icon_url || null,
+              description,
+              minecraftVersion,
+              modPacks: {
+                connect: {
+                  id: newModPack.id,
+                },
+              },
+              modrinthSlug: slug,
+            },
+          });
+        }
       }),
     );
 
