@@ -192,17 +192,17 @@ export class FileService {
     if (!fs.existsSync(targetPath)) {
       throw new Error('Directory does not exist');
     }
-    console.log(directoryPath.replace(/^.*?\\/, ''));
+    console.log(directoryPath);
     console.log(modpackName);
-    console.log(path.join('modpacks', modpackName.replace(/^.*?\\/, '')));
+    // console.log(path.join('modpacks', modpackName.replace(/^.*?\\/, '')));
     const zip = new JSZip();
-    // const filesHashes = await this.getFileHashes(
-    //   modpackName
-    //     ? path.join('modpacks', modpackName).replace(/^.*?\\/, '')
-    //     : directoryPath.replace(/^.*?\\/, ''),
-    // );
-    //
-    // zip.file('launcher-hashes.json', JSON.stringify(filesHashes));
+    const filesHashes = await this.getFileHashes(
+      modpackName
+        ? path.join('modpacks', modpackName).replace(/^.*?\\/, '')
+        : directoryPath.replace(/^.*?\\/, ''),
+    );
+    console.log(filesHashes);
+    zip.file('launcher-hashes.json', JSON.stringify(filesHashes));
 
     try {
       await this.addDirectoryToZip(zip, targetPath);
