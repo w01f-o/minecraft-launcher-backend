@@ -63,7 +63,6 @@ export class ModpackService {
       name,
       modLoader,
       description,
-      isActual,
     } = createModPackDto;
     const fileStructure = await this.fileService.unpackArchive(
       path.join(this.staticFolderName, directoryName),
@@ -103,7 +102,7 @@ export class ModpackService {
         screenshots: {
           createMany: { data: screenshots },
         },
-        isActual,
+        isActual: true,
       },
     });
 
