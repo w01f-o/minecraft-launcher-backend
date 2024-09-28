@@ -52,10 +52,7 @@ export class ModpackService {
     };
   }
 
-  public async create(
-    archive: Express.Multer.File,
-    createModPackDto: CreateDto,
-  ) {
+  public async create(createModPackDto: CreateDto) {
     const {
       directoryName,
       javaVersion,
@@ -64,13 +61,11 @@ export class ModpackService {
       modLoader,
       description,
     } = createModPackDto;
-    console.log('started unpacking');
-    const fileStructure = await this.fileService.unpackArchive(
-      path.join(this.staticFolderName, directoryName),
-      archive,
-    );
 
-    console.log('finished unpacking');
+    const fileStructure = await this.fileService.getFileStructure(
+      path.join(this.staticFolderName, directoryName),
+    );
+    console.log(fileStructure);
     const thumbnail = fileStructure['files'].find(
       (file: FileDetails) =>
         file.path.split('.').shift().trim() === 'thumbnail',
@@ -100,7 +95,7 @@ export class ModpackService {
         modLoader: modLoader.toUpperCase().trim(),
         javaVersion,
         thumbnail,
-        size: archive.size,
+        size: 1,
         screenshots: {
           createMany: { data: screenshots },
         },

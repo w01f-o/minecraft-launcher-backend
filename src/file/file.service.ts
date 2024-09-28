@@ -45,7 +45,7 @@ export class FileService {
 
   public async unpackArchive(
     pathname: string,
-    archive: Express.Multer.File,
+    archiveBuffer: Buffer,
   ): Promise<Record<string, any>> {
     const targetPath = path.join(this.staticPath, pathname);
 
@@ -53,7 +53,7 @@ export class FileService {
       fs.mkdirSync(targetPath, { recursive: true });
     }
 
-    const directory = await unzipper.Open.buffer(archive.buffer);
+    const directory = await unzipper.Open.buffer(archiveBuffer);
     const fileStructure: Record<string, any> = {};
 
     for (const file of directory.files) {

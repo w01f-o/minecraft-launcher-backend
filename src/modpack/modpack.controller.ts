@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,11 +9,8 @@ import {
   Patch,
   Post,
   Res,
-  UploadedFile,
-  UseInterceptors,
 } from '@nestjs/common';
 import { ModpackService } from './modpack.service';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateDto } from './dto/create.dto';
 import * as path from 'node:path';
 import { FileService } from '../file/file.service';
@@ -157,12 +155,21 @@ export class ModpackController {
   }
 
   @Post()
-  @UseInterceptors(FileInterceptor('archive'))
-  public async create(
-    @UploadedFile() archive: Express.Multer.File,
-    @Body() createModPackDto: CreateDto,
-  ) {
-    return await this.modpackService.create(archive, createModPackDto);
+  public async create(@Body() createModPackDto: CreateDto) {
+    const modpackPath = path.join(
+      __dirname,
+      '..',
+      '..',
+      'static',
+      'modpacks',
+      createModPackDto.directoryName,
+    );
+
+    if (!fs.existsSync(modpackPath)) {
+      throw new BadRequestException('Modpack directory not found');
+    }
+
+    return await this.modpackService.create(createModPackDto);
   }
 
   @Patch(':id')
