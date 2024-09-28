@@ -69,14 +69,6 @@ export class ModpackController {
       clientSideHashed,
     );
 
-    console.log('server', serverSideHashed);
-    console.log('client', clientSideHashed);
-
-    console.log({
-      toDownload,
-      toDelete,
-    });
-
     if (toDownload.length > 0) {
       const link = await this.modpackService.createUpdate(
         toDownload,
@@ -117,6 +109,34 @@ export class ModpackController {
     res.set({
       'Content-Type': 'application/zip',
       'Content-Disposition': `attachment; filename="${dirName}.zip"`,
+      'Content-Length': archiveBuffer.length,
+    });
+
+    res.send(archiveBuffer);
+  }
+
+  @Get('get_java/:version')
+  public async getJava(
+    @Param('version') version: string,
+    @Res() res: Response,
+  ) {
+    const archivePath = path.join(
+      __dirname,
+      '..',
+      '..',
+      'static',
+      'javas',
+      `${version}.zip`,
+    );
+    if (!fs.existsSync(archivePath)) {
+      return res.status(404).send('Java not found');
+    }
+
+    const archiveBuffer = fs.readFileSync(archivePath);
+
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${version}.zip"`,
       'Content-Length': archiveBuffer.length,
     });
 
