@@ -65,7 +65,7 @@ export class ModpackService {
     const fileStructure = await this.fileService.getFileStructure(
       path.join(this.staticFolderName, directoryName),
     );
-    console.log(fileStructure);
+
     const thumbnail = fileStructure['thumbnail.jpg']['files'].find(
       (file: FileDetails) =>
         file.path.split('.').shift().trim() === 'thumbnail',

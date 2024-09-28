@@ -327,8 +327,11 @@ export class FileService {
     const tempDir = path.join(this.staticPath, 'temp', tempDirName);
     fs.mkdirSync(tempDir, { recursive: true });
 
+    console.log(tempDir);
+
     for (const filePath of toDownload) {
       const fullPath = path.join(this.staticPath, 'modpacks', filePath);
+      console.log(fullPath);
       if (fs.existsSync(fullPath)) {
         const relativePath = filePath.replace(/^.*?\\/, '');
 
