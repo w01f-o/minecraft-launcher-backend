@@ -194,7 +194,7 @@ export class FileService {
     }
     console.log(directoryPath);
     console.log(modpackName);
-    // console.log(path.join('modpacks', modpackName.replace(/^.*?\\/, '')));.replace(/^.*?\\/, '')
+
     const zip = new JSZip();
     const filesHashes = await this.getFileHashes(
       modpackName ? path.join('modpacks', modpackName) : directoryPath,
