@@ -10,11 +10,11 @@ datasource db {
 model Mod {
   id               String    @id @default(uuid())
   name             String
-  description      String
+  description      String?
   minecraftVersion String    @map("minecraft_version")
   thumbnail        String?
   createdAt        DateTime  @default(now()) @map("created_at")
-  modrinthSlug     String    @unique @map("modrinth_slug")
+  modrinthSlug     String?   @unique @map("modrinth_slug")
   modPacks         ModPack[] @relation("ModToModPack")
 }
 
