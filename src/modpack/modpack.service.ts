@@ -9,6 +9,7 @@ import { FileDetails, FileService } from '../file/file.service';
 import * as path from 'node:path';
 import { ModService } from '../mod/mod.service';
 import { ModrinthMod } from '../types/ModrinthMod.type';
+import * as uuid from 'uuid';
 
 @Injectable()
 export class ModpackService {
@@ -150,6 +151,40 @@ export class ModpackService {
     );
 
     return { ...newModPack, fileStructure };
+  }
+
+  public async createUpdate(toDownload: string[], modpackDirName: string) {
+    const tempArchiveName = await this.fileService.createUpdate(
+      toDownload,
+      modpackDirName,
+    );
+
+    const { link } = await this.databaseService.updateLink.create({
+      data: {
+        link: uuid.v4(),
+        dirName: tempArchiveName,
+      },
+    });
+
+    return link;
+  }
+
+  public async downloadUpdate(link: string) {
+    const { dirName } = await this.databaseService.updateLink.findUnique({
+      where: {
+        link,
+      },
+    });
+
+    setTimeout(() => {
+      this.databaseService.updateLink.delete({
+        where: {
+          link,
+        },
+      });
+    }, 3600000);
+
+    return dirName;
   }
 
   public async update() {}

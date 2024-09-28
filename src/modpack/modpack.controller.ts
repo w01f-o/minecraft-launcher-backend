@@ -16,6 +16,7 @@ import { CreateDto } from './dto/create.dto';
 import * as path from 'node:path';
 import { FileService } from '../file/file.service';
 import { Response } from 'express';
+import * as fs from 'node:fs';
 
 @Controller('modpack')
 export class ModpackController {
@@ -51,6 +52,75 @@ export class ModpackController {
     });
 
     res.send(zipBuffer);
+  }
+
+  @Post('check_update/:id')
+  public async checkUpdate(
+    @Param('id') id: string,
+    @Body() clientSideHashed: Record<string, any>,
+  ) {
+    const modpack = await this.modpackService.getById(id);
+    const serverSideHashed = await this.fileService.getFileHashes(
+      modpack.directoryName,
+    );
+
+    const { toDownload, toDelete } = this.fileService.compareFileStructures(
+      serverSideHashed,
+      clientSideHashed,
+    );
+
+    console.log('server', serverSideHashed);
+    console.log('client', clientSideHashed);
+
+    console.log({
+      toDownload,
+      toDelete,
+    });
+
+    if (toDownload.length > 0) {
+      const link = await this.modpackService.createUpdate(
+        toDownload,
+        modpack.directoryName,
+      );
+
+      return {
+        downloadLink: link,
+        toDelete,
+      };
+    }
+
+    return {
+      toDelete,
+      toDownload: null,
+    };
+  }
+
+  @Get('get_update/:link')
+  public async getUpdate(@Param('link') link: string, @Res() res: Response) {
+    const dirName = await this.modpackService.downloadUpdate(link);
+
+    const archivePath = path.join(
+      __dirname,
+      '..',
+      '..',
+      'static',
+      'temp',
+      `${dirName}.zip`,
+    );
+
+    if (!fs.existsSync(archivePath)) {
+      return res.status(404).send('Archive not found');
+    }
+
+    const archiveBuffer = fs.readFileSync(archivePath);
+
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${dirName}.zip"`,
+      'Content-Length': archiveBuffer.length,
+    });
+
+    res.send(archiveBuffer);
   }
 
   @Post()

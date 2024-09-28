@@ -51,3 +51,9 @@ model Character {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @map("updated_at")
 }
+
+model UpdateLink {
+  id      String @id @default(uuid())
+  link    String @unique
+  dirName String
+}

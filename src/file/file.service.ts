@@ -117,7 +117,7 @@ export class FileService {
     const result: Record<string, any> = {};
 
     if (!fs.existsSync(targetPath)) {
-      return result; // Если путь не существует, возвращаем пустую структуру
+      return result;
     }
 
     const items = fs.readdirSync(targetPath);
@@ -183,7 +183,10 @@ export class FileService {
     return files;
   }
 
-  public async createArchive(directoryPath: string): Promise<Buffer> {
+  public async createArchive(
+    directoryPath: string,
+    modpackName?: string,
+  ): Promise<Buffer> {
     const targetPath = path.join(this.staticPath, directoryPath);
 
     if (!fs.existsSync(targetPath)) {
@@ -191,6 +194,13 @@ export class FileService {
     }
 
     const zip = new JSZip();
+    const filesHashes = await this.getFileHashes(
+      modpackName
+        ? path.join('modpacks', modpackName).replace(/^.*?\\/, '')
+        : directoryPath.replace(/^.*?\\/, ''),
+    );
+
+    zip.file('launcher-hashes.json', JSON.stringify(filesHashes));
 
     try {
       await this.addDirectoryToZip(zip, targetPath);
@@ -232,5 +242,124 @@ export class FileService {
     });
 
     return fileName;
+  }
+
+  public async getFileHashes(
+    modpackDirectoryName: string,
+  ): Promise<Record<string, any>> {
+    const targetPath = path.join(
+      this.staticPath,
+      'modpacks',
+      modpackDirectoryName,
+    );
+    const result: Record<string, any> = {};
+
+    if (!fs.existsSync(targetPath)) {
+      return result;
+    }
+
+    const items = fs.readdirSync(targetPath);
+
+    for (const item of items) {
+      const fullPath = path.join(targetPath, item);
+      const stats = fs.statSync(fullPath);
+
+      if (stats.isDirectory()) {
+        result[path.join(modpackDirectoryName, item)] =
+          await this.getFileHashes(path.join(modpackDirectoryName, item));
+      } else {
+        result[path.join(modpackDirectoryName, item)] =
+          this.calculateFileHash(fullPath);
+      }
+    }
+
+    return result;
+  }
+
+  public compareFileStructures(
+    serverStructure: Record<string, string>,
+    clientStructure: Record<string, string>,
+  ): { toDownload: string[]; toDelete: string[] } {
+    const toDownload: string[] = [];
+    const toDelete: string[] = [];
+
+    const compare = (
+      serverNode: Record<string, string> | string,
+      clientNode: Record<string, string> | string | undefined,
+      currentPath: string,
+    ) => {
+      if (typeof serverNode === 'string') {
+        if (!clientNode || typeof clientNode !== 'string') {
+          toDownload.push(currentPath);
+        } else if (serverNode !== clientNode) {
+          toDownload.push(currentPath);
+        }
+      } else if (typeof serverNode === 'object') {
+        if (!clientNode || typeof clientNode !== 'object') {
+          toDownload.push(currentPath);
+        } else {
+          const serverKeys = Object.keys(serverNode);
+          const clientKeys = Object.keys(clientNode);
+
+          for (const key of serverKeys) {
+            compare(serverNode[key], clientNode[key], key);
+          }
+
+          for (const key of clientKeys) {
+            if (!serverKeys.includes(key)) {
+              toDelete.push(key);
+            }
+          }
+        }
+      }
+    };
+
+    compare(serverStructure, clientStructure, '');
+
+    return { toDownload, toDelete };
+  }
+
+  public async createUpdate(
+    toDownload: string[],
+    modpackDirName: string,
+  ): Promise<string> {
+    const tempDirName = uuid.v4();
+    const tempDir = path.join(this.staticPath, 'temp', tempDirName);
+    fs.mkdirSync(tempDir, { recursive: true });
+
+    for (const filePath of toDownload) {
+      const fullPath = path.join(this.staticPath, 'modpacks', filePath);
+      if (fs.existsSync(fullPath)) {
+        const relativePath = filePath.replace(/^.*?\\/, '');
+
+        const targetPath = path.join(tempDir, relativePath);
+
+        const targetDir = path.dirname(targetPath);
+        fs.mkdirSync(targetDir, { recursive: true });
+
+        fs.copyFileSync(fullPath, targetPath);
+      } else {
+        console.warn(`File does not exist: ${fullPath}`);
+      }
+    }
+
+    const archiveBuffer = await this.createArchive(
+      path.join('temp', tempDirName),
+      modpackDirName,
+    );
+
+    const archivePath = path.join(
+      this.staticPath,
+      'temp',
+      `${tempDirName}.zip`,
+    );
+    fs.writeFileSync(archivePath, archiveBuffer);
+    fs.rmSync(tempDir, { recursive: true, force: true });
+
+    setTimeout(() => {
+      fs.rmSync(archivePath, { force: true });
+    }, 3600000);
+
+    return tempDirName;
   }
 }
