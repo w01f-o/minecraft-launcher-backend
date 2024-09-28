@@ -1,7 +1,7 @@
 import {
+  IsBoolean,
   IsEnum,
   IsNotEmpty,
-  IsOptional,
   IsString,
   Matches,
 } from 'class-validator';
@@ -35,4 +35,8 @@ export class CreateDto {
   @IsString()
   @IsNotEmpty()
   javaVersion: string;
+
+  @IsNotEmpty()
+  @IsBoolean()
+  isActual: boolean;
 }
