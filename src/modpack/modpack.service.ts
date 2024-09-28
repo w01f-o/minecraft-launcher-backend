@@ -10,7 +10,6 @@ import * as path from 'node:path';
 import { ModService } from '../mod/mod.service';
 import { ModrinthMod } from '../types/ModrinthMod.type';
 import * as uuid from 'uuid';
-import { Mod, ModPack } from '@prisma/client';
 
 @Injectable()
 export class ModpackService {
@@ -108,11 +107,10 @@ export class ModpackService {
     });
 
     const modFiles = fileStructure['mods'].files.map((file: FileDetails) => {
-      const modName = file.path.split('/').pop(); // Получаем имя файла мода
+      const modName = file.path.split('/').pop();
       return { modName, modPackId: newModPack.id };
     });
 
-    // Передаём структуру в processMods
     await this.processMods(modFiles);
 
     return { ...newModPack, fileStructure };
@@ -176,8 +174,6 @@ export class ModpackService {
     if (modFiles.length > 0) {
       await this.processMods(modFiles);
     }
-
-    console.log(modFiles);
   }
 
   private async processMods(
