@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -17,6 +18,7 @@ import * as path from 'node:path';
 import { FileService } from '../file/file.service';
 import { Response } from 'express';
 import * as fs from 'node:fs';
+import * as process from 'node:process';
 
 @Controller('modpack')
 export class ModpackController {
@@ -141,6 +143,17 @@ export class ModpackController {
     });
 
     res.send(archiveBuffer);
+  }
+
+  @Get('get_server_data/ip')
+  public async getServerIp() {
+    const ip = process.env.MINECRAFT_SERVER_IP;
+
+    if (!ip) {
+      throw new NotFoundException('Server IP not found');
+    }
+
+    return { serverIp: ip };
   }
 
   @Post()
