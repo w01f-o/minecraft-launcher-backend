@@ -64,11 +64,13 @@ export class ModpackService {
       modLoader,
       description,
     } = createModPackDto;
+    console.log('started unpacking');
     const fileStructure = await this.fileService.unpackArchive(
       path.join(this.staticFolderName, directoryName),
       archive,
     );
-    console.log(fileStructure);
+
+    console.log('finished unpacking');
     const thumbnail = fileStructure['files'].find(
       (file: FileDetails) =>
         file.path.split('.').shift().trim() === 'thumbnail',
