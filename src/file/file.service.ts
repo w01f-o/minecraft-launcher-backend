@@ -273,15 +273,29 @@ export class FileService {
   }
 
   public compareFileStructures(
-    serverStructure: Record<string, string>,
-    clientStructure: Record<string, string>,
+    serverStructure: Record<string, any>,
+    clientStructure: Record<string, any>,
   ): { toDownload: string[]; toDelete: string[] } {
     const toDownload: string[] = [];
     const toDelete: string[] = [];
 
+    // Вспомогательная функция для обхода и добавления всех файлов из новой директории
+    const traverseAndAdd = (node: Record<string, any>, path: string) => {
+      for (const key in node) {
+        if (node.hasOwnProperty(key)) {
+          const fullPath = key; // Ключ уже содержит полный путь
+          if (typeof node[key] === 'string') {
+            toDownload.push(fullPath);
+          } else if (typeof node[key] === 'object') {
+            traverseAndAdd(node[key], fullPath);
+          }
+        }
+      }
+    };
+
     const compare = (
-      serverNode: Record<string, string> | string,
-      clientNode: Record<string, string> | string | undefined,
+      serverNode: Record<string, any> | string,
+      clientNode: Record<string, any> | string | undefined,
       currentPath: string,
     ) => {
       if (typeof serverNode === 'string') {
@@ -292,18 +306,22 @@ export class FileService {
         }
       } else if (typeof serverNode === 'object') {
         if (!clientNode || typeof clientNode !== 'object') {
-          toDownload.push(currentPath);
+          // Если директория отсутствует на клиенте, добавляем все файлы внутри неё
+          traverseAndAdd(serverNode, currentPath);
         } else {
           const serverKeys = Object.keys(serverNode);
           const clientKeys = Object.keys(clientNode);
 
           for (const key of serverKeys) {
-            compare(serverNode[key], clientNode[key], key);
+            const serverChild = serverNode[key];
+            const clientChild = clientNode[key];
+            // Воспринимаем ключ как полный путь
+            compare(serverChild, clientChild, key);
           }
 
           for (const key of clientKeys) {
             if (!serverKeys.includes(key)) {
-              toDelete.push(key);
+              toDelete.push(key); // Добавляем полный путь
             }
           }
         }

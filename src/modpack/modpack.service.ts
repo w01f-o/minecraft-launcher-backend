@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { ModService } from '../mod/mod.service';
 import { ModrinthMod } from '../types/ModrinthMod.type';
 import * as uuid from 'uuid';
+import { Mod, ModPack } from '@prisma/client';
 
 @Injectable()
 export class ModpackService {
@@ -103,50 +104,13 @@ export class ModpackService {
       },
     });
 
-    await Promise.all(
-      fileStructure['mods'].files.map(async (file: FileDetails) => {
-        const modNameFromFile = file.path.split('/').pop().replace(/-.+$/, '');
+    const modFiles = fileStructure['mods'].files.map((file: FileDetails) => {
+      const modName = file.path.split('/').pop(); // Получаем имя файла мода
+      return { modName, modPackId: newModPack.id };
+    });
 
-        const modFromModrinth: ModrinthMod =
-          await this.modService.searchOnModrinth(modNameFromFile);
-        const { icon_url, title, slug, description } = modFromModrinth.hits[0];
-        const modFromDb = await this.databaseService.mod.findUnique({
-          where: {
-            modrinthSlug: slug,
-          },
-        });
-
-        if (modFromDb) {
-          await this.databaseService.mod.update({
-            where: {
-              id: modFromDb.id,
-            },
-            data: {
-              modPacks: {
-                connect: {
-                  id: newModPack.id,
-                },
-              },
-            },
-          });
-        } else {
-          await this.databaseService.mod.create({
-            data: {
-              name: title,
-              thumbnail: icon_url || null,
-              description,
-              minecraftVersion,
-              modPacks: {
-                connect: {
-                  id: newModPack.id,
-                },
-              },
-              modrinthSlug: slug,
-            },
-          });
-        }
-      }),
-    );
+    // Передаём структуру в processMods
+    await this.processMods(modFiles);
 
     return { ...newModPack, fileStructure };
   }
@@ -186,6 +150,108 @@ export class ModpackService {
   }
 
   public async update() {}
+
+  public async checkModFilesAndProcess(
+    toDownload: string[],
+    modPackId: string,
+  ) {
+    const modFiles: { modName: string; modPackId: string }[] = [];
+
+    toDownload.forEach((filePath) => {
+      const normalizedPath = filePath.replace(/\//g, '\\');
+      const parts = normalizedPath.split('\\');
+
+      const modsIndex = parts.findIndex(
+        (part) => part.toLowerCase() === 'mods',
+      );
+      if (modsIndex > 0 && modsIndex < parts.length - 1) {
+        const modName = parts[modsIndex + 1];
+        modFiles.push({ modName, modPackId });
+      }
+    });
+
+    if (modFiles.length > 0) {
+      await this.processMods(modFiles);
+    }
+
+    console.log(modFiles);
+  }
+
+  private async processMods(
+    modFiles: { modName: string; modPackId: string }[],
+  ) {
+    await Promise.all(
+      modFiles.map(async ({ modName, modPackId }) => {
+        const modNameWithoutVersion = modName.replace(/-.+$/, '');
+
+        const modFromModrinth: ModrinthMod =
+          await this.modService.searchOnModrinth(modNameWithoutVersion);
+
+        if (modFromModrinth.hits.length === 0) {
+          await this.databaseService.mod.create({
+            data: {
+              modrinthSlug: null,
+              name: modNameWithoutVersion,
+              thumbnail: null,
+              description: null,
+              minecraftVersion: await this.getMinecraftVersion(modPackId),
+              modPacks: {
+                connect: {
+                  id: modPackId,
+                },
+              },
+            },
+          });
+        } else {
+          const { title, slug, description } = modFromModrinth.hits[0];
+
+          const modFromDb = await this.databaseService.mod.findUnique({
+            where: {
+              modrinthSlug: slug,
+            },
+          });
+
+          if (modFromDb) {
+            await this.databaseService.mod.update({
+              where: {
+                id: modFromDb.id,
+              },
+              data: {
+                modPacks: {
+                  connect: {
+                    id: modPackId,
+                  },
+                },
+              },
+            });
+          } else {
+            await this.databaseService.mod.create({
+              data: {
+                name: title,
+                thumbnail: modFromModrinth.hits[0].icon_url || null,
+                description,
+                minecraftVersion: await this.getMinecraftVersion(modPackId),
+                modPacks: {
+                  connect: {
+                    id: modPackId,
+                  },
+                },
+                modrinthSlug: slug,
+              },
+            });
+          }
+        }
+      }),
+    );
+  }
+
+  private async getMinecraftVersion(modPackId: string): Promise<string> {
+    const modPack = await this.databaseService.modPack.findUnique({
+      where: { id: modPackId },
+      select: { minecraftVersion: true },
+    });
+    return modPack.minecraftVersion;
+  }
 
   public async delete(id: string) {
     return this.databaseService.modPack.delete({
