@@ -192,7 +192,8 @@ export class FileService {
     if (!fs.existsSync(targetPath)) {
       throw new Error('Directory does not exist');
     }
-
+    console.log(directoryPath.replace(/^.*?\\/, ''));
+    console.log(path.join('modpacks', modpackName).replace(/^.*?\\/, ''));
     const zip = new JSZip();
     const filesHashes = await this.getFileHashes(
       modpackName
@@ -327,11 +328,11 @@ export class FileService {
     const tempDir = path.join(this.staticPath, 'temp', tempDirName);
     fs.mkdirSync(tempDir, { recursive: true });
 
-    console.log(tempDir);
+    // console.log(tempDir);
 
     for (const filePath of toDownload) {
       const fullPath = path.join(this.staticPath, 'modpacks', filePath);
-      console.log(fullPath);
+      // console.log(fullPath);
       if (fs.existsSync(fullPath)) {
         const relativePath = filePath.replace(/^.*?\\/, '');
 
