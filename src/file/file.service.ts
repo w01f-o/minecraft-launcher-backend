@@ -193,7 +193,7 @@ export class FileService {
       throw new Error('Directory does not exist');
     }
     console.log(directoryPath.replace(/^.*?\\/, ''));
-    console.log(path.join('modpacks', modpackName).replace(/^.*?\\/, ''));
+    console.log(path.join('modpacks', modpackName.replace(/^.*?\\/, '')));
     const zip = new JSZip();
     // const filesHashes = await this.getFileHashes(
     //   modpackName
