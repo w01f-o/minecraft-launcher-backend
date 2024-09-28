@@ -197,9 +197,7 @@ export class FileService {
     // console.log(path.join('modpacks', modpackName.replace(/^.*?\\/, '')));.replace(/^.*?\\/, '')
     const zip = new JSZip();
     const filesHashes = await this.getFileHashes(
-      modpackName
-        ? path.join('modpacks', modpackName)
-        : directoryPath.replace(/^.*?\\/, ''),
+      modpackName ? path.join('modpacks', modpackName) : directoryPath,
     );
     console.log(filesHashes);
     zip.file('launcher-hashes.json', JSON.stringify(filesHashes));
@@ -249,11 +247,7 @@ export class FileService {
   public async getFileHashes(
     modpackDirectoryName: string,
   ): Promise<Record<string, any>> {
-    const targetPath = path.join(
-      this.staticPath,
-      'modpacks',
-      modpackDirectoryName,
-    );
+    const targetPath = path.join(this.staticPath, modpackDirectoryName);
     const result: Record<string, any> = {};
 
     if (!fs.existsSync(targetPath)) {
