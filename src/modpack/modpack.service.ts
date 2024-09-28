@@ -66,7 +66,7 @@ export class ModpackService {
       path.join(this.staticFolderName, directoryName),
     );
     console.log(fileStructure);
-    const thumbnail = fileStructure['files'].find(
+    const thumbnail = fileStructure['thumbnail.jpg']['files'].find(
       (file: FileDetails) =>
         file.path.split('.').shift().trim() === 'thumbnail',
     )?.fullPath;
