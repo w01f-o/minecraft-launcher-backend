@@ -45,7 +45,7 @@ export class FileService {
 
   public async unpackArchive(
     pathname: string,
-    archiveBuffer: Buffer,
+    archive: Express.Multer.File,
   ): Promise<Record<string, any>> {
     const targetPath = path.join(this.staticPath, pathname);
 
@@ -53,7 +53,7 @@ export class FileService {
       fs.mkdirSync(targetPath, { recursive: true });
     }
 
-    const directory = await unzipper.Open.buffer(archiveBuffer);
+    const directory = await unzipper.Open.buffer(archive.buffer);
     const fileStructure: Record<string, any> = {};
 
     for (const file of directory.files) {
@@ -192,14 +192,14 @@ export class FileService {
     if (!fs.existsSync(targetPath)) {
       throw new Error('Directory does not exist');
     }
-    console.log(directoryPath);
-    console.log(modpackName);
 
     const zip = new JSZip();
     const filesHashes = await this.getFileHashes(
-      modpackName ? path.join('modpacks', modpackName) : directoryPath,
+      modpackName
+        ? path.join('modpacks', modpackName).replace(/^.*?\\/, '')
+        : directoryPath.replace(/^.*?\\/, ''),
     );
-    console.log(filesHashes);
+
     zip.file('launcher-hashes.json', JSON.stringify(filesHashes));
 
     try {
@@ -247,7 +247,11 @@ export class FileService {
   public async getFileHashes(
     modpackDirectoryName: string,
   ): Promise<Record<string, any>> {
-    const targetPath = path.join(this.staticPath, modpackDirectoryName);
+    const targetPath = path.join(
+      this.staticPath,
+      'modpacks',
+      modpackDirectoryName,
+    );
     const result: Record<string, any> = {};
 
     if (!fs.existsSync(targetPath)) {
@@ -341,11 +345,8 @@ export class FileService {
     const tempDir = path.join(this.staticPath, 'temp', tempDirName);
     fs.mkdirSync(tempDir, { recursive: true });
 
-    // console.log(tempDir);
-
     for (const filePath of toDownload) {
       const fullPath = path.join(this.staticPath, 'modpacks', filePath);
-      console.log(fullPath);
       if (fs.existsSync(fullPath)) {
         const relativePath = filePath.replace(/^.*?\\/, '');
 

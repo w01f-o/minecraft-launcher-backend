@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -29,7 +29,7 @@ model ModPack {
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @default(now()) @map("updated_at")
   mods             Mod[]        @relation("ModToModPack")
-  isActual         Boolean      @map("is_actual")
+  isActual         Boolean      @default(true) @map("is_actual")
   javaVersion      String       @map("java_version")
   modLoader        String       @map("mod_loader")
   size             Int          @map("size")

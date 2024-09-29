@@ -10,7 +10,6 @@ import * as path from 'node:path';
 import { ModService } from '../mod/mod.service';
 import { ModrinthMod } from '../types/ModrinthMod.type';
 import * as uuid from 'uuid';
-import { Mod, ModPack } from '@prisma/client';
 
 @Injectable()
 export class ModpackService {
@@ -53,7 +52,10 @@ export class ModpackService {
     };
   }
 
-  public async create(createModPackDto: CreateDto) {
+  public async create(
+    archive: Express.Multer.File,
+    createModPackDto: CreateDto,
+  ) {
     const {
       directoryName,
       javaVersion,
@@ -62,12 +64,12 @@ export class ModpackService {
       modLoader,
       description,
     } = createModPackDto;
-
-    const fileStructure = await this.fileService.getFileStructure(
+    const fileStructure = await this.fileService.unpackArchive(
       path.join(this.staticFolderName, directoryName),
+      archive,
     );
 
-    const thumbnail = fileStructure['thumbnail.jpg']['files'].find(
+    const thumbnail = fileStructure['files'].find(
       (file: FileDetails) =>
         file.path.split('.').shift().trim() === 'thumbnail',
     )?.fullPath;
@@ -96,7 +98,7 @@ export class ModpackService {
         modLoader: modLoader.toUpperCase().trim(),
         javaVersion,
         thumbnail,
-        size: 1,
+        size: archive.size,
         screenshots: {
           createMany: { data: screenshots },
         },
@@ -105,11 +107,10 @@ export class ModpackService {
     });
 
     const modFiles = fileStructure['mods'].files.map((file: FileDetails) => {
-      const modName = file.path.split('/').pop(); // Получаем имя файла мода
+      const modName = file.path.split('/').pop();
       return { modName, modPackId: newModPack.id };
     });
 
-    // Передаём структуру в processMods
     await this.processMods(modFiles);
 
     return { ...newModPack, fileStructure };
@@ -173,8 +174,6 @@ export class ModpackService {
     if (modFiles.length > 0) {
       await this.processMods(modFiles);
     }
-
-    console.log(modFiles);
   }
 
   private async processMods(
