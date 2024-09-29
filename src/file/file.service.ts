@@ -195,7 +195,9 @@ export class FileService {
 
     const zip = new JSZip();
     const filesHashes = await this.getFileHashes(
-      modpackName ? path.join('modpacks', modpackName) : directoryPath,
+      modpackName
+        ? path.join('modpacks', modpackName).replace(/^.*?\\/, '')
+        : directoryPath.replace(/^.*?\\/, ''),
     );
 
     zip.file('launcher-hashes.json', JSON.stringify(filesHashes));
@@ -347,7 +349,7 @@ export class FileService {
 
     for (const filePath of toDownload) {
       const fullPath = path.join(this.staticPath, 'modpacks', filePath);
-      console.log(fullPath);
+
       if (fs.existsSync(fullPath)) {
         const relativePath = filePath.replace(/^.*?\\/, '');
 
