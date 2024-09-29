@@ -70,7 +70,7 @@ export class ModpackService {
       archive,
     );
 
-    const thumbnail = fileStructure['thumbnail.jpg']['files'].find(
+    const thumbnail = fileStructure['files'].find(
       (file: FileDetails) =>
         file.path.split('.').shift().trim() === 'thumbnail',
     )?.fullPath;

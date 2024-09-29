@@ -192,14 +192,12 @@ export class FileService {
     if (!fs.existsSync(targetPath)) {
       throw new Error('Directory does not exist');
     }
-    console.log(directoryPath);
-    console.log(modpackName);
 
     const zip = new JSZip();
     const filesHashes = await this.getFileHashes(
       modpackName ? path.join('modpacks', modpackName) : directoryPath,
     );
-    console.log(filesHashes);
+
     zip.file('launcher-hashes.json', JSON.stringify(filesHashes));
 
     try {

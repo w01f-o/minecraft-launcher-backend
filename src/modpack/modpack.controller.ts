@@ -63,13 +63,19 @@ export class ModpackController {
   ) {
     const modpack = await this.modpackService.getById(id);
     const serverSideHashed = await this.fileService.getFileHashes(
-      modpack.directoryName,
+      path.join(this.modpackService.staticFolderName, modpack.directoryName),
     );
+
+    console.log('serverSideHashed', serverSideHashed);
+    console.log('clientSideHashed', clientSideHashed);
 
     const { toDownload, toDelete } = this.fileService.compareFileStructures(
       serverSideHashed,
       clientSideHashed,
     );
+
+    console.log(toDownload);
+    console.log(toDelete);
 
     if (toDownload.length > 0) {
       const link = await this.modpackService.createUpdate(
