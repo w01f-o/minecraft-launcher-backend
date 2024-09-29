@@ -245,7 +245,11 @@ export class FileService {
   public async getFileHashes(
     modpackDirectoryName: string,
   ): Promise<Record<string, any>> {
-    const targetPath = path.join(this.staticPath, modpackDirectoryName);
+    const targetPath = path.join(
+      this.staticPath,
+      'modpacks',
+      modpackDirectoryName,
+    );
     const result: Record<string, any> = {};
 
     if (!fs.existsSync(targetPath)) {

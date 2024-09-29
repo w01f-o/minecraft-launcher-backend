@@ -63,7 +63,7 @@ export class ModpackController {
   ) {
     const modpack = await this.modpackService.getById(id);
     const serverSideHashed = await this.fileService.getFileHashes(
-      path.join(this.modpackService.staticFolderName, modpack.directoryName),
+      modpack.directoryName,
     );
 
     console.log('serverSideHashed', serverSideHashed);
