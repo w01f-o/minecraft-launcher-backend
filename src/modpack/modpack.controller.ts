@@ -71,9 +71,6 @@ export class ModpackController {
       clientSideHashed,
     );
 
-    console.log(toDownload);
-    console.log(toDelete);
-
     if (toDownload.length > 0) {
       const link = await this.modpackService.createUpdate(
         toDownload,
