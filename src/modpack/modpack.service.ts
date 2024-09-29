@@ -52,7 +52,10 @@ export class ModpackService {
     };
   }
 
-  public async create(createModPackDto: CreateDto) {
+  public async create(
+    archive: Express.Multer.File,
+    createModPackDto: CreateDto,
+  ) {
     const {
       directoryName,
       javaVersion,
@@ -62,8 +65,9 @@ export class ModpackService {
       description,
     } = createModPackDto;
 
-    const fileStructure = await this.fileService.getFileStructure(
+    const fileStructure = await this.fileService.unpackArchive(
       path.join(this.staticFolderName, directoryName),
+      archive,
     );
 
     const thumbnail = fileStructure['thumbnail.jpg']['files'].find(
