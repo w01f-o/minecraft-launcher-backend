@@ -4,24 +4,11 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PathsService } from './paths.service';
 import { StorageLocations } from '../enums/StorageLocations.enum';
-
-export interface FileMetadata {
-  path: string;
-  size: number;
-  hashes: {
-    'sha-512': string;
-  };
-}
-
-export interface Metadata {
-  name: string;
-  files: FileMetadata[];
-}
-
-export interface ComparisonResult {
-  toDownload: string[];
-  toDelete: string[];
-}
+import {
+  ComparisonResult,
+  FileMetadata,
+  Metadata,
+} from '../types/Metadata.types';
 
 @Injectable()
 export class MetadataService {

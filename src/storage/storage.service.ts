@@ -1,12 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PathsService } from './paths.service';
-import { Metadata, MetadataService } from './metadata.service';
 import { StorageLocations } from '../enums/StorageLocations.enum';
 import * as JSZip from 'jszip';
 import * as path from 'node:path';
 import * as fs from 'fs/promises';
 import * as unzipper from 'unzipper';
 import * as uuid from 'uuid';
+import { MetadataService } from './metadata.service';
+import { Metadata } from '../types/Metadata.types';
 
 @Injectable()
 export class StorageService {

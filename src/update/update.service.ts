@@ -3,8 +3,9 @@ import { StorageService } from '../storage/storage.service';
 import { Update } from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
 import { StorageLocations } from '../enums/StorageLocations.enum';
-import { Metadata, MetadataService } from '../storage/metadata.service';
 import { CheckUpdateResult } from '../types/CheckUpdateResult';
+import { MetadataService } from '../storage/metadata.service';
+import { Metadata } from '../types/Metadata.types';
 
 @Injectable()
 export class UpdateService {
