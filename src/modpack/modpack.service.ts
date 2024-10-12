@@ -1,263 +1,103 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { CreateDto } from './dto/create.dto';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { FileDetails, FileService } from '../file/file.service';
+import { StorageService } from '../storage/storage.service';
+import { Modpack } from '@prisma/client';
+import { CreateDto } from './dto/create.dto';
+import { StorageLocations } from '../enums/StorageLocations.enum';
 import * as path from 'node:path';
-import { ModService } from '../mod/mod.service';
-import { ModrinthMod } from '../types/ModrinthMod.type';
-import * as uuid from 'uuid';
+import * as fs from 'node:fs';
+import { PathsService } from '../storage/paths.service';
 
 @Injectable()
 export class ModpackService {
   public constructor(
     private readonly databaseService: DatabaseService,
-    private readonly fileService: FileService,
-    private readonly modService: ModService,
+    private readonly storageService: StorageService,
+    private readonly pathsService: PathsService,
   ) {}
 
-  public readonly staticFolderName: string = 'modpacks';
-
-  public async getAll() {
-    return this.databaseService.modPack.findMany({
-      include: { screenshots: true, mods: true },
+  public async findAll(): Promise<Modpack[]> {
+    return this.databaseService.modpack.findMany({
+      include: {
+        mods: true,
+        screenshots: true,
+      },
     });
   }
 
-  public async getById(id: string) {
-    const modpack = await this.databaseService.modPack.findUnique({
-      where: {
-        id,
-      },
+  public async findById(id: string): Promise<Modpack> {
+    return this.databaseService.modpack.findUnique({
+      where: { id },
       include: {
-        screenshots: true,
         mods: true,
+        screenshots: true,
       },
     });
-
-    if (!modpack) {
-      throw new NotFoundException(`ModPack with id ${id} not found`);
-    }
-
-    const fileStructure = await this.fileService.getFileStructure(
-      path.join(this.staticFolderName, modpack.directoryName),
-    );
-
-    return {
-      ...modpack,
-      fileStructure,
-    };
   }
 
   public async create(
     archive: Express.Multer.File,
-    createModPackDto: CreateDto,
-  ) {
-    const {
-      directoryName,
-      javaVersion,
-      minecraftVersion,
-      name,
-      modLoader,
-      description,
-    } = createModPackDto;
-
-    const fileStructure = await this.fileService.unpackArchive(
-      path.join(this.staticFolderName, directoryName),
+    createModpackDto: CreateDto,
+  ): Promise<Modpack> {
+    const directoryName = await this.storageService.uploadArchive(
       archive,
+      StorageLocations.MODPACKS,
     );
 
-    const thumbnail = fileStructure['files'].find(
-      (file: FileDetails) =>
-        file.path.split('.').shift().trim() === 'thumbnail',
-    )?.fullPath;
-    const screenshots = fileStructure['launcher-screenshots']?.files.map(
-      (file: FileDetails) => ({ thumbnail: file?.fullPath }),
+    const modpackDirectoryPath = await this.pathsService.getStaticDirectoryPath(
+      directoryName,
+      StorageLocations.MODPACKS,
+    );
+    const modpackRelativePath = path.join(
+      StorageLocations.MODPACKS,
+      directoryName,
     );
 
-    if (!thumbnail) {
+    const iconPath = path.join(modpackDirectoryPath, 'modpack-icon.png');
+    if (!fs.existsSync(iconPath)) {
       throw new BadRequestException(
-        'Thumbnail not found. Directory for thumbnail is /',
+        `Modpack icon not found - 'modpack-icon.png'`,
       );
     }
 
-    if (!screenshots) {
-      throw new BadRequestException(
-        'Screenshots not found. Directory for screenshots is /launcher-screenshots',
-      );
-    }
+    const relativeIconPath = path.join(modpackRelativePath, 'modpack-icon.png');
 
-    const newModPack = await this.databaseService.modPack.create({
+    const modpackMods = fs
+      .readdirSync(path.join(modpackDirectoryPath, 'mods'))
+      .map((modFile) => ({
+        name: modFile,
+        minecraftVersion: createModpackDto.minecraftVersion,
+      }));
+
+    const modpackScreenshots = fs
+      .readdirSync(path.join(modpackDirectoryPath, 'modpack-screenshots'))
+      .map((screenshotFile) => ({
+        url: path.join(
+          modpackRelativePath,
+          'modpack-screenshots',
+          screenshotFile,
+        ),
+      }));
+
+    return this.databaseService.modpack.create({
       data: {
-        name,
+        ...createModpackDto,
         directoryName,
-        description,
-        minecraftVersion,
-        modLoader: modLoader.toUpperCase().trim(),
-        javaVersion,
-        thumbnail,
-        size: 1,
+        size: archive.size,
+        icon: relativeIconPath,
+        mods: {
+          create: modpackMods,
+        },
         screenshots: {
-          createMany: { data: screenshots },
+          createMany: {
+            data: modpackScreenshots,
+          },
         },
-        isActual: true,
       },
     });
-
-    const modFiles = fileStructure['mods'].files.map((file: FileDetails) => {
-      const modName = file.path.split('/').pop();
-      return { modName, modPackId: newModPack.id };
-    });
-
-    await this.processMods(modFiles);
-
-    return { ...newModPack, fileStructure };
   }
 
-  public async createUpdate(toDownload: string[], modpackDirName: string) {
-    const tempArchiveName = await this.fileService.createUpdate(
-      toDownload,
-      modpackDirName,
-    );
-
-    const { link } = await this.databaseService.updateLink.create({
-      data: {
-        link: uuid.v4(),
-        dirName: tempArchiveName,
-      },
-    });
-
-    return link;
-  }
-
-  public async downloadUpdate(link: string) {
-    const { dirName } = await this.databaseService.updateLink.findUnique({
-      where: {
-        link,
-      },
-    });
-
-    setTimeout(() => {
-      this.databaseService.updateLink.delete({
-        where: {
-          link,
-        },
-      });
-    }, 3600000);
-
-    return dirName;
-  }
-
-  public async update() {}
-
-  public async checkModFilesAndProcess(
-    toDownload: string[],
-    modPackId: string,
-  ) {
-    const modFiles: { modName: string; modPackId: string }[] = [];
-
-    toDownload.forEach((filePath) => {
-      const normalizedPath = filePath.replace(/\//g, '\\');
-      const parts = normalizedPath.split('\\');
-
-      const modsIndex = parts.findIndex(
-        (part) => part.toLowerCase() === 'mods',
-      );
-      if (modsIndex > 0 && modsIndex < parts.length - 1) {
-        const modName = parts[modsIndex + 1];
-        modFiles.push({ modName, modPackId });
-      }
-    });
-
-    if (modFiles.length > 0) {
-      await this.processMods(modFiles);
-    }
-  }
-
-  private async processMods(
-    modFiles: { modName: string; modPackId: string }[],
-  ) {
-    await Promise.all(
-      modFiles.map(async ({ modName, modPackId }) => {
-        const modNameWithoutVersion = modName.replace(/-.+$/, '');
-
-        const modFromModrinth: ModrinthMod =
-          await this.modService.searchOnModrinth(modNameWithoutVersion);
-
-        if (modFromModrinth.hits.length === 0) {
-          await this.databaseService.mod.create({
-            data: {
-              modrinthSlug: null,
-              name: modNameWithoutVersion,
-              thumbnail: null,
-              description: null,
-              minecraftVersion: await this.getMinecraftVersion(modPackId),
-              modPacks: {
-                connect: {
-                  id: modPackId,
-                },
-              },
-            },
-          });
-        } else {
-          const { title, slug, description } = modFromModrinth.hits[0];
-
-          const modFromDb = await this.databaseService.mod.findUnique({
-            where: {
-              modrinthSlug: slug,
-            },
-          });
-
-          if (modFromDb) {
-            await this.databaseService.mod.update({
-              where: {
-                id: modFromDb.id,
-              },
-              data: {
-                modPacks: {
-                  connect: {
-                    id: modPackId,
-                  },
-                },
-              },
-            });
-          } else {
-            await this.databaseService.mod.create({
-              data: {
-                name: title,
-                thumbnail: modFromModrinth.hits[0].icon_url || null,
-                description,
-                minecraftVersion: await this.getMinecraftVersion(modPackId),
-                modPacks: {
-                  connect: {
-                    id: modPackId,
-                  },
-                },
-                modrinthSlug: slug,
-              },
-            });
-          }
-        }
-      }),
-    );
-  }
-
-  private async getMinecraftVersion(modPackId: string): Promise<string> {
-    const modPack = await this.databaseService.modPack.findUnique({
-      where: { id: modPackId },
-      select: { minecraftVersion: true },
-    });
-    return modPack.minecraftVersion;
-  }
-
-  public async delete(id: string) {
-    return this.databaseService.modPack.delete({
-      where: {
-        id,
-      },
-    });
+  public async delete(id: string): Promise<Modpack> {
+    return this.databaseService.modpack.delete({ where: { id } });
   }
 }

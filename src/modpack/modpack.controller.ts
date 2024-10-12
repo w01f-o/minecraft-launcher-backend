@@ -3,175 +3,68 @@ import {
   Controller,
   Delete,
   Get,
-  NotFoundException,
   Param,
-  Patch,
   Post,
   Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { ModpackService } from './modpack.service';
+import { StorageLocations } from '../enums/StorageLocations.enum';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { CreateDto } from './dto/create.dto';
-import * as path from 'node:path';
-import { FileService } from '../file/file.service';
+import { StorageService } from '../storage/storage.service';
 import { Response } from 'express';
-import * as fs from 'node:fs';
-import * as process from 'node:process';
+import { CreateDto } from './dto/create.dto';
+import { Modpack } from '@prisma/client';
 
-@Controller('modpack')
+@Controller('modpacks')
 export class ModpackController {
   constructor(
     private readonly modpackService: ModpackService,
-    private readonly fileService: FileService,
+    private readonly storageService: StorageService,
   ) {}
 
   @Get()
-  public async getAll() {
-    return this.modpackService.getAll();
+  public async findAll(): Promise<Modpack[]> {
+    return await this.modpackService.findAll();
   }
 
   @Get(':id')
-  public async getById(@Param('id') id: string) {
-    return await this.modpackService.getById(id);
+  public async findById(@Param('id') id: string): Promise<Modpack> {
+    return await this.modpackService.findById(id);
   }
 
   @Get('download/:id')
-  public async download(@Param('id') id: string, @Res() res: Response) {
-    const modpack = await this.modpackService.getById(id);
-    const modpackPath = path.join(
-      this.modpackService.staticFolderName,
+  public async download(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const modpack = await this.modpackService.findById(id);
+    const modpackBuffer = await this.storageService.downloadArchive(
       modpack.directoryName,
+      StorageLocations.MODPACKS,
     );
-
-    const zipBuffer = await this.fileService.createArchive(modpackPath);
 
     res.set({
       'Content-Type': 'application/zip',
       'Content-Disposition': `attachment; filename="${modpack.directoryName}.zip"`,
-      'Content-Length': zipBuffer.length,
+      'Content-Length': modpackBuffer.length,
     });
 
-    res.send(zipBuffer);
-  }
-
-  @Post('check_update/:id')
-  public async checkUpdate(
-    @Param('id') id: string,
-    @Body() clientSideHashed: Record<string, any>,
-  ) {
-    const modpack = await this.modpackService.getById(id);
-    const serverSideHashed = await this.fileService.getFileHashes(
-      modpack.directoryName,
-    );
-
-    const { toDownload, toDelete } = this.fileService.compareFileStructures(
-      serverSideHashed,
-      clientSideHashed,
-    );
-
-    if (toDownload.length > 0) {
-      const link = await this.modpackService.createUpdate(
-        toDownload,
-        modpack.directoryName,
-      );
-
-      await this.modpackService.checkModFilesAndProcess(toDownload, id);
-
-      return {
-        downloadLink: link,
-        toDelete,
-      };
-    }
-
-    return {
-      toDelete,
-      toDownload: null,
-    };
-  }
-
-  @Get('get_update/:link')
-  public async getUpdate(@Param('link') link: string, @Res() res: Response) {
-    const dirName = await this.modpackService.downloadUpdate(link);
-
-    const archivePath = path.join(
-      __dirname,
-      '..',
-      '..',
-      'static',
-      'temp',
-      `${dirName}.zip`,
-    );
-
-    if (!fs.existsSync(archivePath)) {
-      return res.status(404).send('Archive not found');
-    }
-
-    const archiveBuffer = fs.readFileSync(archivePath);
-
-    res.set({
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${dirName}.zip"`,
-      'Content-Length': archiveBuffer.length,
-    });
-
-    res.send(archiveBuffer);
-  }
-
-  @Get('get_java/:version')
-  public async getJava(
-    @Param('version') version: string,
-    @Res() res: Response,
-  ) {
-    const archivePath = path.join(
-      __dirname,
-      '..',
-      '..',
-      'static',
-      'javas',
-      `${version}.zip`,
-    );
-    if (!fs.existsSync(archivePath)) {
-      return res.status(404).send('Java not found');
-    }
-
-    const archiveBuffer = fs.readFileSync(archivePath);
-
-    res.set({
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${version}.zip"`,
-      'Content-Length': archiveBuffer.length,
-    });
-
-    res.send(archiveBuffer);
-  }
-
-  @Get('get_server_data/ip')
-  public async getServerIp() {
-    const ip = process.env.MINECRAFT_SERVER_IP;
-
-    if (!ip) {
-      throw new NotFoundException('Server IP not found');
-    }
-
-    return { serverIp: ip };
+    res.send(modpackBuffer);
   }
 
   @Post()
   @UseInterceptors(FileInterceptor('archive'))
   public async create(
     @UploadedFile() archive: Express.Multer.File,
-    @Body() createModPackDto: CreateDto,
-  ) {
-    return await this.modpackService.create(archive, createModPackDto);
+    @Body() createModpackDto: CreateDto,
+  ): Promise<Modpack> {
+    return this.modpackService.create(archive, createModpackDto);
   }
 
-  @Patch(':id')
-  public async update() {}
-
   @Delete(':id')
-  public async delete(@Param('id') id: string) {
+  public async delete(@Param('id') id: string): Promise<Modpack> {
     return await this.modpackService.delete(id);
   }
 }

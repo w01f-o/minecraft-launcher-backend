@@ -1,178 +1,113 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
-import { FileService } from 'src/file/file.service';
-import { UpdateDto } from './dto/set.dto';
-import { Character } from '../types/Character.type';
-import * as crypto from 'crypto';
-import * as fs from 'fs';
-import { promisify } from 'util';
-import * as path from 'path';
+import { StorageService } from 'src/storage/storage.service';
+import { UpdateDto } from './dtos/update.dto';
+import { StorageLocations } from '../enums/StorageLocations.enum';
 
 @Injectable()
 export class CharacterService {
   public constructor(
     private readonly databaseService: DatabaseService,
-    private readonly fileService: FileService,
+    private readonly storageService: StorageService,
   ) {}
 
-  public readonly staticFolderName: string = 'characters';
+  public async getCharacterByUsernameOrHwid(identifier: string) {
+    const username = identifier.replace(/\.[^.]+$/, '');
 
-  public async getCharacterByUserName(user: string): Promise<Character> {
-    const username = user.split('.').shift();
-
-    const character = await this.databaseService.character.findFirst({
+    let character = await this.databaseService.character.findFirst({
       where: {
-        username,
+        OR: [
+          {
+            username,
+          },
+          {
+            hwid: identifier,
+          },
+        ],
       },
     });
 
+    if (!character) {
+      character = await this.databaseService.character.create({
+        data: {
+          hwid: identifier,
+        },
+      });
+    }
+
     return {
-      username,
+      username: character.username,
       skins: {
-        default: character?.skin ?? null,
+        default: character.skin,
       },
-      cape: character?.cape ?? null,
+      cape: character.cape,
     };
   }
 
-  public async getCharacterByHwid(hwid: string): Promise<Character> {
-    const character = await this.databaseService.character.findUnique({
-      where: { hwid },
-    });
-
-    return {
-      username: character?.username ?? null,
-      skins: {
-        default: character?.skin ?? null,
-      },
-      cape: character?.cape ?? null,
-    };
-  }
-
-  public async updateOrSave(
+  public async update(
     updateCharacterDto: UpdateDto,
     files: {
       skin?: Express.Multer.File[];
       cape?: Express.Multer.File[];
     },
-  ): Promise<Character> {
-    const { hwid, username } = updateCharacterDto;
-
-    const characterFromDb = await this.databaseService.character.findUnique({
-      where: { hwid },
+  ) {
+    const character = await this.databaseService.character.findFirst({
+      where: {
+        hwid: updateCharacterDto.hwid,
+      },
     });
 
-    let capeFileName: string | null = null;
     let skinFileName: string | null = null;
-
-    const readFile = promisify(fs.readFile);
-    const readdir = promisify(fs.readdir);
-
-    const calculateHash = async (
-      file: Express.Multer.File,
-    ): Promise<string> => {
-      return crypto.createHash('sha256').update(file.buffer).digest('hex');
-    };
-
-    const checkIfFileExists = async (hash: string): Promise<string | null> => {
-      const dirPath = path.join(
-        __dirname,
-        '..',
-        '..',
-        'static',
-        this.staticFolderName,
-      );
-      const files = await readdir(dirPath);
-
-      for (const file of files) {
-        const filePath = path.join(dirPath, file);
-        const existingFileBuffer = await readFile(filePath);
-        const existingFileHash = crypto
-          .createHash('sha256')
-          .update(existingFileBuffer)
-          .digest('hex');
-
-        if (existingFileHash === hash) {
-          return file;
-        }
-      }
-
-      return null;
-    };
-
-    if (files.cape) {
-      const capeHash = await calculateHash(files.cape[0]);
-      capeFileName = await checkIfFileExists(capeHash);
-      if (!capeFileName) {
-        capeFileName = await this.fileService.saveFileOnServer(
-          files.cape[0],
-          this.staticFolderName,
-        );
-      }
-    }
+    let capeFileName: string | null = null;
 
     if (files.skin) {
-      const skinHash = await calculateHash(files.skin[0]);
-      skinFileName = await checkIfFileExists(skinHash);
-      if (!skinFileName) {
-        skinFileName = await this.fileService.saveFileOnServer(
-          files.skin[0],
-          this.staticFolderName,
-        );
-      }
+      skinFileName = await this.storageService.uploadFile(
+        files.skin[0],
+        StorageLocations.CHARACTERS,
+      );
     }
 
-    if (!characterFromDb) {
-      const char = await this.databaseService.character.create({
-        data: {
-          username,
-          cape: capeFileName,
-          skin: skinFileName,
-          hwid,
-        },
-      });
-
-      return {
-        username: char.username ?? 'Steve',
-        skins: {
-          default: char?.skin ?? '',
-        },
-        cape: char?.cape ?? '',
-      };
+    if (files.cape) {
+      capeFileName = await this.storageService.uploadFile(
+        files.cape[0],
+        StorageLocations.CHARACTERS,
+      );
     }
 
-    const char = await this.databaseService.character.update({
-      where: { hwid },
+    if (!character) {
+      throw new NotFoundException('Character not found');
+    }
+
+    return this.databaseService.character.update({
+      where: {
+        id: character.id,
+      },
       data: {
-        cape: capeFileName ?? characterFromDb?.cape,
-        skin: skinFileName ?? characterFromDb?.skin,
-        username,
+        username: updateCharacterDto.username ?? character.username,
+        skin: skinFileName ?? character.skin,
+        cape: capeFileName ?? character.cape,
+      },
+    });
+  }
+
+  public async deleteCape(hwid: string) {
+    const character = await this.databaseService.character.findFirst({
+      where: {
+        hwid,
       },
     });
 
-    return {
-      username: char.username,
-      skins: {
-        default: char?.skin ?? '',
-      },
-      cape: char?.cape ?? '',
-    };
-  }
+    if (!character) {
+      throw new NotFoundException('Character not found');
+    }
 
-  public async deleteCape(hwid: string): Promise<Character> {
-    const char = await this.databaseService.character.update({
-      where: { hwid },
+    return this.databaseService.character.update({
+      where: {
+        id: character.id,
+      },
       data: {
         cape: null,
       },
     });
-
-    return {
-      username: char.username,
-      skins: {
-        default: char?.skin ?? '',
-      },
-      cape: char?.cape ?? '',
-    };
   }
 }

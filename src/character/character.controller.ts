@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  NotFoundException,
   Param,
   Patch,
   Res,
@@ -12,44 +11,37 @@ import {
 } from '@nestjs/common';
 import { CharacterService } from './character.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import * as fs from 'fs';
-import { createReadStream } from 'fs';
-import * as path from 'path';
-import { UpdateDto } from './dto/set.dto';
+import { UpdateDto } from './dtos/update.dto';
+import { StorageService } from '../storage/storage.service';
+import { StorageLocations } from '../enums/StorageLocations.enum';
 import { Response } from 'express';
 
-@Controller('character')
+@Controller('characters')
 export class CharacterController {
-  constructor(private readonly characterService: CharacterService) {}
+  constructor(
+    private readonly characterService: CharacterService,
+    private readonly storageService: StorageService,
+  ) {}
 
-  @Get(':user')
-  async getCharacterByUsername(@Param('user') user: string) {
-    return this.characterService.getCharacterByUserName(user);
+  @Get(':identifier')
+  async getCharacterByUsernameOrHwid(@Param('identifier') identifier: string) {
+    return this.characterService.getCharacterByUsernameOrHwid(identifier);
   }
 
-  @Get('hwid/:hwid')
-  async getCharacterByHwid(@Param('hwid') hwid: string) {
-    return this.characterService.getCharacterByHwid(hwid);
-  }
-
-  @Get('textures/:skin')
-  async getSkinImage(@Res() res: Response, @Param('skin') skin: string) {
-    const skinPath = path.join(
-      __dirname,
-      '..',
-      '..',
-      'static',
-      this.characterService.staticFolderName,
-      skin,
+  @Get('textures/:fileName')
+  async getTexture(@Res() res: Response, @Param('fileName') fileName: string) {
+    const fileBuffer = await this.storageService.downloadFile(
+      fileName,
+      StorageLocations.CHARACTERS,
     );
 
-    if (!fs.existsSync(skinPath)) {
-      throw new NotFoundException('Skin not found');
-    }
+    res.set({
+      'Content-Type': 'image/png',
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+      'Content-Length': fileBuffer.length,
+    });
 
-    const file = createReadStream(skinPath);
-
-    return file.pipe(res);
+    res.send(fileBuffer);
   }
 
   @Patch()
@@ -59,7 +51,7 @@ export class CharacterController {
       { name: 'cape', maxCount: 1 },
     ]),
   )
-  async updateOrSave(
+  async update(
     @UploadedFiles()
     files: {
       skin?: Express.Multer.File[];
@@ -67,7 +59,7 @@ export class CharacterController {
     },
     @Body() updateCharacterDto: UpdateDto,
   ) {
-    return this.characterService.updateOrSave(updateCharacterDto, files);
+    return this.characterService.update(updateCharacterDto, files);
   }
 
   @Delete('cape/:hwid')

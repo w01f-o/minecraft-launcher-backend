@@ -9,11 +9,11 @@ export class CreateDto {
 
   @IsString()
   @IsNotEmpty()
-  directoryName: string;
+  description: string;
 
   @IsString()
   @IsNotEmpty()
-  description: string;
+  javaVersion: string;
 
   @IsString()
   @IsNotEmpty()
@@ -25,8 +25,4 @@ export class CreateDto {
   @Transform(({ value }) => value.toUpperCase().trim())
   @IsEnum(ModLoaders)
   modLoader: string;
-
-  @IsString()
-  @IsNotEmpty()
-  javaVersion: string;
 }

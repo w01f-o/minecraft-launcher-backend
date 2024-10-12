@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -11,25 +11,25 @@ model Mod {
   id               String    @id @default(uuid())
   name             String
   description      String?
+  icon             String?
   minecraftVersion String    @map("minecraft_version")
-  thumbnail        String?
   createdAt        DateTime  @default(now()) @map("created_at")
   modrinthSlug     String?   @unique @map("modrinth_slug")
-  modPacks         ModPack[] @relation("ModToModPack")
+  modPacks         Modpack[] @relation("ModToModPack")
 }
 
-model ModPack {
+model Modpack {
   id               String       @id @default(uuid())
   name             String
   directoryName    String       @map("directory_name")
   description      String
   minecraftVersion String       @map("minecraft_version")
-  thumbnail        String
+  icon             String
   screenshots      Screenshot[]
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @default(now()) @map("updated_at")
   mods             Mod[]        @relation("ModToModPack")
-  isActual         Boolean      @map("is_actual")
+  isActual         Boolean      @default(true) @map("is_actual")
   javaVersion      String       @map("java_version")
   modLoader        String       @map("mod_loader")
   size             Int          @map("size")
@@ -37,9 +37,9 @@ model ModPack {
 
 model Screenshot {
   id        String  @id @default(uuid())
-  thumbnail String
-  modPackId String  @map("modPack_id")
-  modPack   ModPack @relation(fields: [modPackId], references: [id], onDelete: Cascade)
+  url       String
+  modpackId String  @map("modpack_id")
+  modPack   Modpack @relation(fields: [modpackId], references: [id], onDelete: Cascade)
 }
 
 model Character {
@@ -52,8 +52,19 @@ model Character {
   updatedAt DateTime @default(now()) @map("updated_at")
 }
 
-model UpdateLink {
-  id      String @id @default(uuid())
-  link    String @unique
-  dirName String
+model Java {
+  id           String   @id @default(uuid())
+  version      String
+  os           String
+  architecture String
+  fileName     String   @unique @map("file_name")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @map("updated_at")
+}
+
+model Update {
+  id                   String   @id @default(uuid())
+  link                 String   @unique
+  modpackDirectoryName String   @map("modpack_directory_name")
+  createdAt            DateTime @default(now()) @map("created_at")
 }
