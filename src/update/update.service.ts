@@ -6,6 +6,8 @@ import { StorageLocations } from '../enums/StorageLocations.enum';
 import { CheckUpdateResult } from '../types/CheckUpdateResult';
 import { MetadataService } from '../storage/metadata.service';
 import { Metadata } from '../types/Metadata.types';
+import * as fs from 'node:fs';
+import { PathsService } from '../storage/paths.service';
 
 @Injectable()
 export class UpdateService {
@@ -13,6 +15,7 @@ export class UpdateService {
     private readonly databaseService: DatabaseService,
     private readonly storageService: StorageService,
     private readonly metadataService: MetadataService,
+    private readonly pathsService: PathsService,
   ) {}
 
   public async findUpdateByLink(link: string): Promise<Update> {
@@ -49,11 +52,28 @@ export class UpdateService {
           modpackDirectoryName: modpack.directoryName,
         },
       });
+
+      setTimeout(
+        async () => {
+          fs.rmdirSync(
+            await this.pathsService.getStaticDirectoryPath(
+              downloadLink,
+              StorageLocations.TEMP,
+            ),
+          );
+          await this.databaseService.update.delete({
+            where: { link: downloadLink },
+          });
+        },
+        1000 * 60 * 60,
+      );
     }
 
     return {
       downloadLink,
       toDelete,
+      serverMetadata:
+        !!toDelete.length || !!toDownload.length ? serverMetadata : null,
     };
   }
 }

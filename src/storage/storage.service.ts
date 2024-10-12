@@ -92,7 +92,7 @@ export class StorageService {
     zip: JSZip,
     files: string[],
     directoryPath: string,
-    metadata: Metadata,
+    metadata?: Metadata,
   ): Promise<void> {
     await Promise.all(
       files.map(async (filePath) => {
@@ -104,7 +104,9 @@ export class StorageService {
       }),
     );
 
-    zip.file(this.metadataFileName, JSON.stringify(metadata, null, 2));
+    if (metadata) {
+      zip.file(this.metadataFileName, JSON.stringify(metadata, null, 2));
+    }
   }
 
   public async downloadArchive(
@@ -145,12 +147,8 @@ export class StorageService {
       );
       const zip = new JSZip();
       const files = await this.metadataService.walkDirectory(directoryPath);
-      const metadata = await this.metadataService.createMetadataStructure(
-        modpackDirectoryName,
-        StorageLocations.MODPACKS,
-      );
 
-      await this.addFilesAndMetadataToZip(zip, files, directoryPath, metadata);
+      await this.addFilesAndMetadataToZip(zip, files, directoryPath);
 
       return await zip.generateAsync({ type: 'nodebuffer' });
     } catch (error) {
