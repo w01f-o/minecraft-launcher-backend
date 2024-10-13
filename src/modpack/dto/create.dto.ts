@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsString, Matches } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsString, IsUrl, Matches } from 'class-validator';
 import { ModLoaders } from '../../enums/ModLoaders.enum';
 import { Transform } from 'class-transformer';
 
@@ -14,6 +14,11 @@ export class CreateDto {
   @IsString()
   @IsNotEmpty()
   javaVersion: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsUrl()
+  author: string;
 
   @IsString()
   @IsNotEmpty()

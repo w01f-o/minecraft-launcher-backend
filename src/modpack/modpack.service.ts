@@ -93,6 +93,7 @@ export class ModpackService {
             data: modpackScreenshots,
           },
         },
+        isActual: true,
       },
     });
   }
