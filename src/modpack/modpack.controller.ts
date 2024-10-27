@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Res,
   UploadedFile,
@@ -34,6 +35,11 @@ export class ModpackController {
     return await this.modpackService.findById(id);
   }
 
+  @Patch('revalidate_mods')
+  public async revalidateMods() {
+    return await this.modpackService.revalidateMods();
+  }
+
   @Get('download/:id')
   public async download(
     @Param('id') id: string,
@@ -60,7 +66,10 @@ export class ModpackController {
     @UploadedFile() archive: Express.Multer.File,
     @Body() createModpackDto: CreateDto,
   ): Promise<Modpack> {
-    return this.modpackService.create(archive, createModpackDto);
+    const modpack = await this.modpackService.create(archive, createModpackDto);
+    await this.modpackService.revalidateMods();
+
+    return modpack;
   }
 
   @Delete(':id')

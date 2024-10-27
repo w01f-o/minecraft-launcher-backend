@@ -8,20 +8,20 @@ datasource db {
 }
 
 model Mod {
-  id               String    @id @default(uuid())
+  id               String    @id @default(cuid())
   name             String
   description      String?
-  icon             String?
-  minecraftVersion String    @map("minecraft_version")
+  thumbnail        String?
+  minecraftVersion String?   @map("minecraft_version")
   createdAt        DateTime  @default(now()) @map("created_at")
-  modrinthSlug     String?   @unique @map("modrinth_slug")
+  modrinthSlug     String?   @map("modrinth_slug")
   modPacks         Modpack[] @relation("ModToModPack")
 }
 
 model Modpack {
-  id               String       @id @default(uuid())
+  id               String       @id @default(cuid())
   name             String
-  directoryName    String       @map("directory_name")
+  directoryName    String       @unique @map("directory_name")
   description      String
   minecraftVersion String       @map("minecraft_version")
   icon             String
@@ -37,14 +37,14 @@ model Modpack {
 }
 
 model Screenshot {
-  id        String  @id @default(uuid())
+  id        String  @id @default(cuid())
   url       String
   modpackId String  @map("modpack_id")
   modPack   Modpack @relation(fields: [modpackId], references: [id], onDelete: Cascade)
 }
 
 model Character {
-  id        String   @id @default(uuid())
+  id        String   @id @default(cuid())
   hwid      String   @unique
   username  String   @default("Steve")
   skin      String?
@@ -64,7 +64,7 @@ model Java {
 }
 
 model Update {
-  id                   String   @id @default(uuid())
+  id                   String   @id @default(cuid())
   link                 String   @unique
   modpackDirectoryName String   @map("modpack_directory_name")
   createdAt            DateTime @default(now()) @map("created_at")
